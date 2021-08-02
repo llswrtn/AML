@@ -16,12 +16,15 @@ class DataWrapperImages:
         
         if len(children) == 0:
             print("error no children")
-        elif len(children) == 1:
-            return (children[0].path + "/" + image_id)
         else:
             for i, child in enumerate(children):
                 potential_path = child.path + "/" + image_id
                 if os.path.exists(potential_path):
-                    return (children[0].path + "/" + image_id)
+                    return potential_path
             print("error no child with image_id")
         return ""
+
+    def TestGetImagePath(self):
+        for i in range(6334):
+            path = self.GetImagePath(i)
+            assert os.path.exists(path)

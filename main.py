@@ -1,9 +1,18 @@
 from data_wrapper_images import DataWrapperImages
 import pydicom as dicom
 import matplotlib.pyplot as plt
+import os
+
+def RunTests():
+    print("running tests...")
+    data_wrapper_images.TestGetImagePath()
+    print("tests completed")
+
 
 if __name__ == "__main__":
     data_wrapper_images = DataWrapperImages()
+    RunTests()
+
     path = data_wrapper_images.GetImagePath(0)
     print(path)
     ds = dicom.dcmread(path)
