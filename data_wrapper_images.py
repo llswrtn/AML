@@ -3,15 +3,17 @@ import pandas as pd
 
 class DataWrapperImages:
 
-    def __init__(self):
-        self.data_frame = pd.read_csv ("data/train_image_level.csv")
+    def __init__(self, data_path):
+        print("data_path: "+data_path)
+        self.data_path = data_path
+        self.data_frame = pd.read_csv (data_path+"train_image_level.csv")
 
     def GetImagePath(self, row_index):
         image_id = self.data_frame.loc[row_index,"id"].replace("_image", ".dcm")
         #boxes =  self.data_frame.loc[row_index,"boxes"]
         #label =  self.data_frame.loc[row_index,"label"]
         instance_id =  self.data_frame.loc[row_index,"StudyInstanceUID"]        
-        path = "data/train/" + instance_id
+        path = self.data_path+"train/" + instance_id
         children = [f for f in os.scandir(path) if f.is_dir()]
         
         if len(children) == 0:
