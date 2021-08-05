@@ -7,7 +7,7 @@ import math
 
 class BasicNetwork(nn.Module):
     """
-    Deep Q Learning Neural Network class
+    Basic functionality like saving and loading
     """
 
     def __init__(self):   
