@@ -1,17 +1,32 @@
 from data_wrapper_images import DataWrapperImages
+from simple_cnn import SimpleCNN
+import torch as T
+import numpy as np
 import pydicom as dicom
 import matplotlib.pyplot as plt
 import sys
 import getopt
 import os
 
+def TestSimpleCNN():
+    cnn = SimpleCNN().to(device)
+
+    data = np.zeros((3,448,448))
+    data = data.reshape(1, *data.shape)
+    input_tensor = T.tensor(data, dtype=T.float32, device=device)
+    output_tensor = cnn(input_tensor)
+    print(output_tensor)
+
 def RunTests():
     print("running tests...")
     data_wrapper_images.TestGetImagePath()
+    TestSimpleCNN()
     print("tests completed")
+
 
 if __name__ == "__main__":    
     data_path = "data"
+    use_cuda = True
     try:
         opts, args = getopt.getopt(sys.argv[1:],"p:h",["path=", "help"])
     except getopt.GetoptError:
@@ -21,6 +36,15 @@ if __name__ == "__main__":
         if opt == '-p':
             data_path = arg
     data_path += "/"
+
+    #region CUDA
+    if use_cuda and T.cuda.is_available():
+        print("CUDA ENABLED")
+        device = T.device("cuda")
+    else:                
+        print("CUDA NOT AVAILABLE OR DISABLED")
+        device = T.device("cpu")
+    #endregion
 
     data_wrapper_images = DataWrapperImages(data_path)
     RunTests()
