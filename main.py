@@ -1,5 +1,5 @@
 from data_wrapper_images import DataWrapperImages
-from simple_cnn import Yolo
+from yolo import Yolo
 import torch as T
 import numpy as np
 import pydicom as dicom
