@@ -16,7 +16,7 @@ class BasicNetwork(nn.Module):
         """   
         super(BasicNetwork, self).__init__()   
         self.debug = True
-        print("__init__ BasicNetwork")     
+        print("init BasicNetwork")     
 
     def print_debug(self, text, value):
         if(self.debug):

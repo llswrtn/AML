@@ -1,5 +1,5 @@
 from data_wrapper_images import DataWrapperImages
-from simple_cnn import SimpleCNN
+from simple_cnn import Yolo
 import torch as T
 import numpy as np
 import pydicom as dicom
@@ -8,19 +8,22 @@ import sys
 import getopt
 import os
 
-def TestSimpleCNN():
-    cnn = SimpleCNN().to(device)
+def TestYolo():
+    number_of_classes = 4
+    yolo = Yolo(number_of_classes).to(device)
 
     data = np.zeros((3,448,448))
     data = data.reshape(1, *data.shape)
     input_tensor = T.tensor(data, dtype=T.float32, device=device)
-    output_tensor = cnn(input_tensor)
-    print(output_tensor)
+    output_tensor = yolo(input_tensor)
+    #print(output_tensor)
+    print(output_tensor.shape)
+    #yolo.save("save.pt")#--> 1GB
 
 def RunTests():
     print("running tests...")
     data_wrapper_images.TestGetImagePath()
-    TestSimpleCNN()
+    TestYolo()
     print("tests completed")
 
 
