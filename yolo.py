@@ -4,13 +4,24 @@ class Yolo(BasicNetwork):
     """
     Neural Network test
     """
-    def __init__(self, number_of_classes, dropout_p=0.5):
+    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5):
         super(Yolo, self).__init__()        
         print("init Yolo")
         self.leaky_slope = 0.1  
         self.number_of_classes = number_of_classes
+        self.boxes_per_cell = boxes_per_cell
         self.dropout_p = dropout_p
+        #alternative names for easier use
+        self.B = boxes_per_cell
+        self.C = number_of_classes        
+        self.S = 7
+        #helper variables
+        self.values_per_cell = self.B*5+self.C
+
+        self.generate_grid_data()
+
         #setup layers
+      
 
         #region COLUMN 0
         #Conv. Layer 7x7x64-s-2
@@ -239,12 +250,39 @@ class Yolo(BasicNetwork):
 
         #region COLUMN 7
         #Conn Layer
-        S = 7
-        B = 2
-        C = number_of_classes
-        self.values_per_cell = B*5+C
-        self.layer_30_full = nn.Linear(4069, S*S*(B*5+C))
+        self.layer_30_full = nn.Linear(4069, self.S*self.S*(self.values_per_cell))
         #endregion
+
+    def generate_grid_data(self):
+        """
+        Generates a grid with shape (num_boxes, 6) with the following values for each box:
+        grid x index, grid y index, cell min x, cell max x, cell min y, cell max y
+        """
+        print("generate_grid_data")
+        x = T.arange(self.S)
+        y = T.arange(self.S)
+        grid_x, grid_y  = T.meshgrid(x, y)
+        flat_x = T.reshape(grid_x, (self.S*self.S, 1))
+        flat_y = T.reshape(grid_y, (self.S*self.S, 1))
+        data = T.cat((flat_x, flat_y), dim=1)
+        min_x = data[:,0] / self.S
+        max_x = (data[:,0]+1) / self.S
+        min_y = data[:,1] / self.S
+        max_y = (data[:,1]+1) / self.S
+        #append dimension for concatenating
+        min_x = T.reshape(min_x, (*min_x.shape, 1))
+        max_x = T.reshape(max_x, (*max_x.shape, 1))
+        min_y = T.reshape(min_y, (*min_y.shape, 1))
+        max_y = T.reshape(max_y, (*max_y.shape, 1))
+        data = T.cat((data, min_x, max_x, min_y, max_y), dim=1)
+
+        stacked_data = data
+        for i in range(self.B-1):            
+            stacked_data = T.cat((stacked_data, data), dim=0)
+        print("stacked_data ", stacked_data)
+
+        self.grid_data = data
+        self.stacked_grid_data = stacked_data
 
     def forward(self, x):     
         #print("forward:", x.size())
@@ -317,7 +355,128 @@ class Yolo(BasicNetwork):
         self.print_debug("layer_30_full", x.size())
 
         #reshape tensor
-        x = T.reshape(x, (x.shape[0], 7, 7, self.values_per_cell))
+        x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
         return x
 
+    def to_separate_box_data(self, batch_index, input_tensor):
+        """
+        Prepares the output of "forward" for use with "non_max_suppression".
+
+        :param batch_index: the index in this batch.
+
+        :param input_tensor: the input tensor with shape identical to the output of the forward method (batch_size, S, S, B*5+C).
         
+        :returns separate_box_data: tensor in the shape (num_boxes, 5+C)
+        """
+        #extract data of the specified index in the batch
+        data = input_tensor[batch_index]
+        #reshape the data so that cells are in one dimension instead of two
+        data = data.reshape((data.shape[0] * data.shape[1], data.shape[2]))
+
+        #current shape: (S*S, values_per_cell)
+        #the current shape describes B boxes per cell,
+        #but we require the boxes to be separate.
+        cells = self.S*self.S
+        separate_box_data = T.zeros((cells*self.B, 5 + self.C))
+        for i in range(self.B):
+            #calculate the class indices from the number of boxes
+            class_indices = T.arange(self.C)+(self.B*5)
+            #calculate the first 5 values depending on i (the rest is copied in the next step)
+            indices = T.arange(5 + self.C)+(i*5)
+            #copy the class indices
+            indices[-self.C:] = class_indices
+            #extract data for the current box
+            current_box_data = data[:, indices]
+            #copy extracted data into 
+            start = cells*i
+            separate_box_data[start:start+cells,:] = current_box_data
+        #print("separate_box_data", separate_box_data)
+        return separate_box_data    
+
+    def to_converted_box_data(self, separate_box_data):
+        """
+        Converts boxes from (ccenterx, ccentery, w, h) to (x1, y1, x2, y2)
+
+        :param input_tensor: the input tensor with shape (num_boxes, 5+C) as provided by to_separate_box_data.
+        box coordinates are represented as (ccenterx, ccentery, w, h)
+
+        :returns converted_box_data: tensor in the shape (num_boxes, 5+C)
+        box coordinates are represented as (x1, y1, x2, y2) with 0 <= x1 < x2 and 0 <= y1 < y2
+        """
+        converted_box_data = separate_box_data
+        #center coordinates are relative to the grid cells
+        #interpolate inside the grid cells to get coordinates relative to image
+        center_x = T.lerp(
+            self.stacked_grid_data[:,2], 
+            self.stacked_grid_data[:,3], 
+            separate_box_data[:,0])
+        center_y = T.lerp(
+            self.stacked_grid_data[:,4], 
+            self.stacked_grid_data[:,5], 
+            separate_box_data[:,1])
+
+        #calculate min and max coordinates using the center coordinates relative to the image
+        #and half width/height
+        w_half = separate_box_data[:,2] / 2
+        h_half = separate_box_data[:,3] / 2
+        converted_box_data[:,0] = center_x - w_half
+        converted_box_data[:,1] = center_y - h_half
+        converted_box_data[:,2] = center_x + w_half
+        converted_box_data[:,3] = center_y + h_half
+        return converted_box_data
+
+    def non_max_suppression(self, batch_index, input_tensor, iou_threshold=0.5, score_threshold=0.5):
+        """
+        Applies nms to one image of the batch.
+
+        :param batch_index: the index in this batch.
+
+        :param input_tensor: the input tensor with shape identical to the output of the forward method
+        (batch_size, S, S, B*5+C).
+        """
+        #torchvision.ops.nms requires one tensor for the boxes, and one tensor for the scores.
+        #split cells into B separate boxes
+        separate_box_data = self.to_separate_box_data(batch_index, input_tensor)
+        #convert boxes from (ccenterx, ccentery, w, h) to (x1, y1, x2, y2) 
+        converted_box_data = self.to_converted_box_data(separate_box_data)
+        boxes = converted_box_data[:,[0,1,2,3]]#(x1, y1, x2, y2) with 0 <= x1 < x2 and 0 <= y1 < y2
+        scores = converted_box_data[:,4]
+        #pre filtering via score threshold
+        filter_score_threshold = scores > score_threshold
+        filter_indices = T.arange(self.S*self.S*self.B)[filter_score_threshold]
+        #apply non maximum suppression with pre filtered data
+        keep_indices = torchvision.ops.nms(boxes[filter_score_threshold], 
+            scores[filter_score_threshold], iou_threshold=iou_threshold)
+        #get the unfiltered indices
+        correct_indices = filter_indices[keep_indices]
+        #print("filter_score_threshold", filter_score_threshold)
+        #print("filter_indices", filter_indices)
+        #print("correct_indices", correct_indices)
+        return correct_indices
+        #print(boxes)
+        #print(scores)
+        #print(keep_indices)
+        #print("separate_box_data", separate_box_data.shape)
+        
+        #for i in range(self.B):
+        #    start = cells*i
+        #    stop = cells*i+cells-1
+        #    print(start, separate_box_data[start])
+        #    print(stop, separate_box_data[stop])
+
+
+        #class_indices = self.B*5+i
+        #print("select_b_0", select_b_0)
+        """
+        boxes = T.tensor([
+	    [1, 1, 3, 3],
+	    [1, 1, 3, 4],
+	    [1, 0.9, 3.6, 3],
+	    [1, 0.9, 3.5, 3]
+	    ]) 
+        
+        scores = T.tensor([0.95, 0.93, 0.98, 0.97]) 
+        keep_indices = torchvision.ops.nms(boxes, scores, iou_threshold=0.7)
+        print(keep_indices)
+        pass
+        """
