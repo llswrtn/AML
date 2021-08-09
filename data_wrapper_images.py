@@ -13,7 +13,7 @@ class DataWrapperImages:
         self.data_path_448 = data_path_448
         self.data_frame = pd.read_csv (data_path+"train_image_level.csv")
 
-    def GetImagePath(self, row_index, original=True):
+    def get_image_path(self, row_index, original=True):
         image_id = self.data_frame.loc[row_index,"id"].replace("_image", ".dcm")
         #boxes =  self.data_frame.loc[row_index,"boxes"]
         #label =  self.data_frame.loc[row_index,"label"]
@@ -35,18 +35,18 @@ class DataWrapperImages:
             print("error no child with image_id")
         return ""
 
-    def TestGetImagePath(self):
+    def test_get_image_path(self):
         for i in range(6334):
-            path = self.GetImagePath(i)
+            path = self.get_image_path(i)
             assert os.path.exists(path)
 
     def plot_row(self, row_index):
-        path = self.GetImagePath(row_index, original=True)
+        path = self.get_image_path(row_index, original=True)
         ds = dicom.dcmread(path)
         plt.subplot(1, 2, 1)
         plt.imshow(ds.pixel_array)
 
-        path = self.GetImagePath(row_index, original=False)
+        path = self.get_image_path(row_index, original=False)
         pixel_array = np.load(path)
         plt.subplot(1, 2, 2)
         plt.imshow(pixel_array)

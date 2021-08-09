@@ -258,7 +258,6 @@ class Yolo(BasicNetwork):
         Generates a grid with shape (num_boxes, 6) with the following values for each box:
         grid x index, grid y index, cell min x, cell max x, cell min y, cell max y
         """
-        print("generate_grid_data")
         x = T.arange(self.S)
         y = T.arange(self.S)
         grid_x, grid_y  = T.meshgrid(x, y)
@@ -279,7 +278,6 @@ class Yolo(BasicNetwork):
         stacked_data = data
         for i in range(self.B-1):            
             stacked_data = T.cat((stacked_data, data), dim=0)
-        print("stacked_data ", stacked_data)
 
         self.grid_data = data
         self.stacked_grid_data = stacked_data
@@ -449,34 +447,8 @@ class Yolo(BasicNetwork):
             scores[filter_score_threshold], iou_threshold=iou_threshold)
         #get the unfiltered indices
         correct_indices = filter_indices[keep_indices]
-        #print("filter_score_threshold", filter_score_threshold)
-        #print("filter_indices", filter_indices)
-        #print("correct_indices", correct_indices)
-        return correct_indices
-        #print(boxes)
-        #print(scores)
-        #print(keep_indices)
-        #print("separate_box_data", separate_box_data.shape)
-        
-        #for i in range(self.B):
-        #    start = cells*i
-        #    stop = cells*i+cells-1
-        #    print(start, separate_box_data[start])
-        #    print(stop, separate_box_data[stop])
+        #get the converted box data for those indices
+        filtered_converted_box_data = converted_box_data[correct_indices]
 
-
-        #class_indices = self.B*5+i
-        #print("select_b_0", select_b_0)
-        """
-        boxes = T.tensor([
-	    [1, 1, 3, 3],
-	    [1, 1, 3, 4],
-	    [1, 0.9, 3.6, 3],
-	    [1, 0.9, 3.5, 3]
-	    ]) 
-        
-        scores = T.tensor([0.95, 0.93, 0.98, 0.97]) 
-        keep_indices = torchvision.ops.nms(boxes, scores, iou_threshold=0.7)
-        print(keep_indices)
-        pass
-        """
+        filtered_grid_data = self.stacked_grid_data[correct_indices]
+        return correct_indices, filtered_converted_box_data, filtered_grid_data
