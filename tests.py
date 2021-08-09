@@ -4,10 +4,42 @@ import torch as T
 import numpy as np
 import pydicom as dicom
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import sys
 import getopt
 import os
 from PIL import Image
+
+def plot_boxes_and_cells(correct_indices, filtered_converted_box_data, filtered_grid_data):
+    fig, ax = plt.subplots()
+    
+    #create gray rectangles for all active cells
+    for i in range(correct_indices.shape[0]):
+        min_x = filtered_grid_data[i,2]
+        max_x = filtered_grid_data[i,3]
+        min_y = filtered_grid_data[i,4]
+        max_y = filtered_grid_data[i,5]
+        x = (min_x + max_x) / 2
+        y = (min_y + max_y) / 2
+        w = max_x - min_x
+        h = max_y - min_y
+        rect = patches.Rectangle((min_x, min_y), w, h, linewidth=1, edgecolor='gray', facecolor='none')
+        ax.add_patch(rect)
+
+    #create red rectangles for all active boxes
+    for i in range(correct_indices.shape[0]):
+        min_x = filtered_converted_box_data[i,0]
+        min_y = filtered_converted_box_data[i,1]
+        max_x = filtered_converted_box_data[i,2]
+        max_y = filtered_converted_box_data[i,3]
+        x = (min_x + max_x) / 2
+        y = (min_y + max_y) / 2
+        w = max_x - min_x
+        h = max_y - min_y
+        rect = patches.Rectangle((min_x, min_y), w, h, linewidth=1, edgecolor='r', facecolor='none')
+        ax.add_patch(rect)
+
+    plt.show()
 
 def test_yolo(device, yolo):
     data = np.zeros((3,448,448))
@@ -52,23 +84,37 @@ def test_non_max_suppression(device, yolo):
     data[0,0,0,9] = 0.9#score
 
     #generate two overlapping boxes in neighboring cells
-    data[0,5,0,5] = 0.9#ccenterx
-    data[0,5,0,6] = 0.3#ccentery
-    data[0,5,0,7] = 0.5#w
-    data[0,5,0,8] = 0.1#h
-    data[0,5,0,9] = 0.75#score
+    data[0,4,5,5] = 0.9#ccenterx
+    data[0,4,5,6] = 0.3#ccentery
+    data[0,4,5,7] = 0.3#w
+    data[0,4,5,8] = 0.1#h
+    data[0,4,5,9] = 0.75#score
 
-    data[0,6,0,5] = 0.1#ccenterx
-    data[0,6,0,6] = 0.3#ccentery
-    data[0,6,0,7] = 0.5#w
-    data[0,6,0,8] = 0.1#h
-    data[0,6,0,9] = 0.74#score
+    data[0,5,5,5] = 0.1#ccenterx
+    data[0,5,5,6] = 0.3#ccentery
+    data[0,5,5,7] = 0.3#w
+    data[0,5,5,8] = 0.1#h
+    data[0,5,5,9] = 0.74#score
+
+    #generate two overlapping boxes in neighboring cells
+    data[0,4,3,5] = 0.8#ccenterx
+    data[0,4,3,6] = 0.4#ccentery
+    data[0,4,3,7] = 0.2#w
+    data[0,4,3,8] = 0.1#h
+    data[0,4,3,9] = 0.75#score
+
+    data[0,5,3,5] = 0.3#ccenterx
+    data[0,5,3,6] = 0.7#ccentery
+    data[0,5,3,7] = 0.18#w
+    data[0,5,3,8] = 0.18#h
+    data[0,5,3,9] = 0.74#score
 
     input_tensor = T.tensor(data, dtype=T.float32, device=device)
     correct_indices, filtered_converted_box_data, filtered_grid_data = yolo.non_max_suppression(0, input_tensor)
     print("correct_indices", correct_indices)
     print("filtered_converted_box_data", filtered_converted_box_data)
     print("filtered_grid_data", filtered_grid_data)
+    plot_boxes_and_cells(correct_indices, filtered_converted_box_data, filtered_grid_data)
    
 
 def run_tests(device, data_wrapper_images):
