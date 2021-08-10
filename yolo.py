@@ -26,7 +26,7 @@ class Yolo(BasicNetwork):
         #region COLUMN 0
         #Conv. Layer 7x7x64-s-2
         self.layer_0_conv = nn.Conv2d(
-            in_channels=3, 
+            in_channels=1, 
             out_channels=64, 
             kernel_size=7, 
             stride=2, 

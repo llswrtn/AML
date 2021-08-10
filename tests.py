@@ -1,6 +1,7 @@
 from data_wrapper_images import DataWrapperImages
 from yolo import Yolo
 import torch as T
+import torchvision
 import numpy as np
 import pydicom as dicom
 import matplotlib.pyplot as plt
@@ -44,6 +45,7 @@ def plot_boxes_and_cells(correct_indices, filtered_converted_box_data, filtered_
 def test_yolo(device, yolo):
     data = np.zeros((3,448,448))
     data = data.reshape(1, *data.shape)
+    data = np.random.rand(2,1,448,448)
     input_tensor = T.tensor(data, dtype=T.float32, device=device)
     output_tensor = yolo(input_tensor)
     #print(output_tensor)
@@ -116,12 +118,33 @@ def test_non_max_suppression(device, yolo):
     print("filtered_grid_data", filtered_grid_data)
     plot_boxes_and_cells(correct_indices, filtered_converted_box_data, filtered_grid_data)
    
+def test_iou(device):
+    #predicted boxes
+    boxes1 = np.array([
+        [0.5, 0.5, 0.6, 0.6],
+        [0.0, 0.0, 0.2, 0.1], 
+        [0.0, 0.0, 0.3, 0.1],
+        [0.8, 0.8, 0.91, 0.91]])
+
+    #ground truth boxes
+    boxes2 = np.array([
+        [0.0, 0.0, 0.2, 0.1], 
+        [0.9, 0.9, 1.0, 1.0]])
+
+    boxes1 = T.tensor(boxes1, dtype=T.float32, device=device)
+    boxes2 = T.tensor(boxes2, dtype=T.float32, device=device)
+    #(x1, y1, x2, y2) format with 0 <= x1 < x2 and 0 <= y1 < y2
+    iou = torchvision.ops.box_iou(boxes1, boxes2)
+    responsible_indices = T.argmax(iou, dim=0)
+    print("iou", iou)
+    print("responsible_indices", responsible_indices)
 
 def run_tests(device, data_wrapper_images):
     print("running tests...")
     data_wrapper_images.test_get_image_path()
-    yolo = Yolo(number_of_classes=4, boxes_per_cell=2).to(device)
+    test_iou(device)
+    #yolo = Yolo(number_of_classes=4, boxes_per_cell=2).to(device)
     #test_yolo(device, yolo)
-    test_non_max_suppression(device, yolo)
+    #test_non_max_suppression(device, yolo)
     #test_to_converted_box_data(yolo)
     print("tests completed")
