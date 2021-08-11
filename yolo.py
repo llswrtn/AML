@@ -17,9 +17,6 @@ class Yolo(BasicNetwork):
         self.S = 7
         #helper variables
         self.values_per_cell = self.B*5+self.C
-
-        self.generate_grid_data()
-
         #setup layers
       
 
@@ -253,6 +250,10 @@ class Yolo(BasicNetwork):
         self.layer_30_full = nn.Linear(4069, self.S*self.S*(self.values_per_cell))
         #endregion
 
+    def initialize(self, device):
+        self.device = device
+        self.generate_grid_data()
+
     def generate_grid_data(self):
         """
         Generates a grid with shape (num_boxes, 6) with the following values for each box:
@@ -279,8 +280,8 @@ class Yolo(BasicNetwork):
         for i in range(self.B-1):            
             stacked_data = T.cat((stacked_data, data), dim=0)
 
-        self.grid_data = data
-        self.stacked_grid_data = stacked_data
+        self.grid_data = data.to(self.device)
+        self.stacked_grid_data = stacked_data.to(self.device)
 
     def forward(self, x):     
         #print("forward:", x.size())
@@ -389,7 +390,7 @@ class Yolo(BasicNetwork):
             start = cells*i
             separate_box_data[start:start+cells,:] = current_box_data
         #print("separate_box_data", separate_box_data)
-        return separate_box_data    
+        return separate_box_data.to(self.device)    
 
     def to_converted_box_data(self, separate_box_data):
         """
@@ -423,6 +424,21 @@ class Yolo(BasicNetwork):
         converted_box_data[:,3] = center_y + h_half
         return converted_box_data
 
+    def prepare_data(self, batch_index, forward_result, device):
+        """
+        Converts the results of the forward method.
+
+        :param batch_index: the index in this batch.
+
+        :param forward_result: the output of the forward method
+        (batch_size, S, S, B*5+C).
+        """
+        #split cells into B separate boxes
+        separate_box_data = self.to_separate_box_data(batch_index, forward_result)
+        #convert boxes from (ccenterx, ccentery, w, h) to (x1, y1, x2, y2) 
+        converted_box_data = self.to_converted_box_data(separate_box_data)
+        return converted_box_data.to(device)
+
     def non_max_suppression(self, batch_index, input_tensor, iou_threshold=0.5, score_threshold=0.5):
         """
         Applies nms to one image of the batch.
@@ -452,3 +468,56 @@ class Yolo(BasicNetwork):
 
         filtered_grid_data = self.stacked_grid_data[correct_indices]
         return correct_indices, filtered_converted_box_data, filtered_grid_data
+
+    def get_responsible_indices(self, converted_box_data, ground_truth_boxes):
+        iou = torchvision.ops.box_iou(converted_box_data[:,0:4], ground_truth_boxes)
+        responsible_indices = T.argmax(iou, dim=0)
+        return responsible_indices
+
+    def get_intersected_cells(self, ground_truth_boxes):
+        print("self.grid_data", self.grid_data)
+        intersected_cells_mask = T.empty((self.grid_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.bool, device=self.device)
+        print("intersected_cells_mask", intersected_cells_mask)
+        print("ground_truth_boxes[i,0]", ground_truth_boxes[0,0])
+        
+        #boolean expression to check whether two AABBs intersect
+        #rect_a.left <= rect_b.right && 
+        #rect_a.right >= rect_b.left &&
+        #rect_a.top >= rect_b.bottom && 
+        #rect_a.bottom <= rect_b.top
+
+        #let rect_a be the ground_truth_boxes and rect_b be the grid_data
+        #ground_truth_boxes: (x1, y1, x2, y2)
+        #grid_data: (grid x index, grid y index, cell min x, cell max x, cell min y, cell max y)
+        for i in range(ground_truth_boxes.shape[0]):
+            intersected_cells_mask[:,i] = (
+                (ground_truth_boxes[i,0] <= self.grid_data[:,3]) & 
+                (ground_truth_boxes[i,2] >= self.grid_data[:,2]) &
+                (ground_truth_boxes[i,3] >= self.grid_data[:,4]) & 
+                (ground_truth_boxes[i,1] <= self.grid_data[:,5]))
+
+        #col = np.empty((self.grid_data.shape[0], self.ground_truth_boxes.shape[0]))
+        intersected_cells_1 = T.zeros_like(intersected_cells_mask, dtype=T.float32, device=self.device)
+        intersected_cells_1[intersected_cells_mask] = 1
+        print("intersected_cells_mask", intersected_cells_mask)
+        print("intersected_cells_1", intersected_cells_1)
+        #print("col", col.shape)
+        return intersected_cells_mask, intersected_cells_1
+
+    def get_loss(self, device, converted_box_data, ground_truth_boxes):
+        """
+        Calculates loss for a single image.
+
+        :param converted_box_data: the boxes obtained from prepare_data.
+
+        :param ground_truth_boxes: the ground truth boxes.
+        """
+        print("get_loss")
+        print("converted_box_data", converted_box_data[:,0:5])
+        print("ground_truth_boxes", ground_truth_boxes)
+        iou = torchvision.ops.box_iou(converted_box_data[:,0:4], ground_truth_boxes)
+        responsible_indices = T.argmax(iou, dim=0)
+        print("iou", iou)
+        print("responsible_indices", responsible_indices)
+        intersected_cells = self.get_intersected_cells(ground_truth_boxes)
+        print("intersected_cells", intersected_cells)

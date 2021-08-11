@@ -1,5 +1,6 @@
 from data_wrapper_images import DataWrapperImages
 from yolo import Yolo
+from plot_boxes import *
 import torch as T
 import torchvision
 import numpy as np
@@ -11,36 +12,6 @@ import getopt
 import os
 from PIL import Image
 
-def plot_boxes_and_cells(correct_indices, filtered_converted_box_data, filtered_grid_data):
-    fig, ax = plt.subplots()
-    
-    #create gray rectangles for all active cells
-    for i in range(correct_indices.shape[0]):
-        min_x = filtered_grid_data[i,2]
-        max_x = filtered_grid_data[i,3]
-        min_y = filtered_grid_data[i,4]
-        max_y = filtered_grid_data[i,5]
-        x = (min_x + max_x) / 2
-        y = (min_y + max_y) / 2
-        w = max_x - min_x
-        h = max_y - min_y
-        rect = patches.Rectangle((min_x, min_y), w, h, linewidth=1, edgecolor='gray', facecolor='none')
-        ax.add_patch(rect)
-
-    #create red rectangles for all active boxes
-    for i in range(correct_indices.shape[0]):
-        min_x = filtered_converted_box_data[i,0]
-        min_y = filtered_converted_box_data[i,1]
-        max_x = filtered_converted_box_data[i,2]
-        max_y = filtered_converted_box_data[i,3]
-        x = (min_x + max_x) / 2
-        y = (min_y + max_y) / 2
-        w = max_x - min_x
-        h = max_y - min_y
-        rect = patches.Rectangle((min_x, min_y), w, h, linewidth=1, edgecolor='r', facecolor='none')
-        ax.add_patch(rect)
-
-    plt.show()
 
 def test_yolo(device, yolo):
     data = np.zeros((3,448,448))
@@ -139,11 +110,59 @@ def test_iou(device):
     print("iou", iou)
     print("responsible_indices", responsible_indices)
 
+def test_get_responsible_indices(device, yolo):
+    np.random.seed(1)
+    data = np.random.rand(64,yolo.S,yolo.S,yolo.values_per_cell)
+
+    ground_truth_boxes = np.array([
+        [0.2, 0.2, 0.4, 0.4], 
+        [0.6, 0.6, 0.8, 0.8]])
+    ground_truth_boxes = T.tensor(ground_truth_boxes, dtype=T.float32, device=device)
+
+    #simulate forward
+    dummy_forward_result = T.tensor(data, dtype=T.float32, device=device)
+    #convert result of forward
+    converted_box_data = yolo.prepare_data(0, dummy_forward_result, device=device)
+    #get responsible indices
+    responsible_indices = yolo.get_responsible_indices(converted_box_data, ground_truth_boxes)
+    #plot
+    plot_responsible_and_ground_truth(responsible_indices, converted_box_data, ground_truth_boxes)
+
+def test_get_intersected_cells(device, yolo):
+    ground_truth_boxes = np.array([
+        [0.2, 0.2, 0.4, 0.4], 
+        [0.6, 0.6, 0.8, 0.8]])
+    ground_truth_boxes = T.tensor(ground_truth_boxes, dtype=T.float32, device=device)
+
+    intersected_cells_mask, intersected_cells_1 = yolo.get_intersected_cells(ground_truth_boxes)
+    #plot
+    plot_intersected_cells_and_ground_truth(intersected_cells_mask, yolo.grid_data, ground_truth_boxes)
+
+def test_loss(device, yolo):
+    np.random.seed(1)
+    data = np.random.rand(64,yolo.S,yolo.S,yolo.values_per_cell)
+
+    ground_truth = np.array([
+        [0.2, 0.2, 0.4, 0.4], 
+        [0.6, 0.6, 0.8, 0.8]])
+    ground_truth = T.tensor(ground_truth, dtype=T.float32, device=device)
+
+    #simulate forward
+    dummy_forward_result = T.tensor(data, dtype=T.float32, device=device)
+    #convert result of forward
+    converted_box_data = yolo.prepare_data(0, dummy_forward_result, device=device)
+    #call loss function for one image
+    yolo.get_loss(device, converted_box_data, ground_truth)
+
 def run_tests(device, data_wrapper_images):
     print("running tests...")
     data_wrapper_images.test_get_image_path()
     test_iou(device)
-    #yolo = Yolo(number_of_classes=4, boxes_per_cell=2).to(device)
+    yolo = Yolo(number_of_classes=4, boxes_per_cell=2).to(device)
+    yolo.initialize(device)
+    test_get_intersected_cells(device, yolo)
+    #test_get_responsible_indices(device, yolo)
+    test_loss(device, yolo)
     #test_yolo(device, yolo)
     #test_non_max_suppression(device, yolo)
     #test_to_converted_box_data(yolo)
