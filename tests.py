@@ -124,7 +124,7 @@ def test_get_responsible_indices(device, yolo):
     #convert result of forward
     converted_box_data = yolo.prepare_data(0, dummy_forward_result, device=device)
     #get responsible indices
-    responsible_indices, responsible_indices_1 = yolo.get_responsible_indices(converted_box_data, ground_truth_boxes)
+    responsible_indices, responsible_indices_1, responsible_indices_any_1, responsible_indices_noobj_1 = yolo.get_responsible_indices(converted_box_data, ground_truth_boxes)
     #plot
     plot_responsible_and_ground_truth(responsible_indices, converted_box_data, ground_truth_boxes)
 

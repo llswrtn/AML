@@ -481,22 +481,43 @@ class Yolo(BasicNetwork):
         :returns responsible_indices: the box indices responsible for each ground truth box
         tensor in the shape (num_ground_truth_boxes)
 
-        :returns responsible_indices_1: 1 or 0 for each (box, ground_truth_box) pair
+        :returns responsible_indices_1: 1 or 0 for each (box, ground_truth_box) pair, 1 if the box is responsible
+        for the specific ground truth box of the pair
         tensor in the shape (num_boxes, num_ground_truth_boxes)
+
+        :returns responsible_indices_any_1: 1 or 0 for each box, 1 if the box is responsible for any of the ground truth boxes
+        tensor in the shape (num_boxes, 1)
+
+        :returns responsible_indices_noobj_1: 0 or 1 for each box, 1 if the box is NOT responsible for any of the ground truth boxes
+        tensor in the shape (num_boxes, 1)
+        the paper mentions that they 'decrease the loss from confidence predictions for boxes that don't contain objects',
+        so we interpret this as the inverted responsible_indices_any_1, but we are unsure if this is correct
         """
         iou = torchvision.ops.box_iou(converted_box_data[:,0:4], ground_truth_boxes)
         responsible_indices = T.argmax(iou, dim=0)
         indices = T.arange(0, responsible_indices.shape[0], dtype=T.long)
-        responsible_indices_1 = T.zeros((converted_box_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.float32, device=self.device)
-                        
+        
+        responsible_indices_1 = T.zeros((converted_box_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.float32, device=self.device)                
         responsible_indices_1[responsible_indices, indices] = 1
-        return responsible_indices, responsible_indices_1
+
+        responsible_indices_any_1 = T.max(responsible_indices_1, dim=1).values
+        responsible_indices_any_1 = T.reshape(responsible_indices_any_1, (self.S*self.S*self.B, 1))
+        #print("responsible_indices_any_1", responsible_indices_any_1)
+
+        responsible_indices_noobj_1 = T.ones_like(responsible_indices_any_1)
+        responsible_indices_noobj_1[responsible_indices_any_1 > 0] = 0
+        #print("responsible_indices_noobj_1", responsible_indices_noobj_1)
+        
+        #responsible_indices_noobj_1 = T.ones((converted_box_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.float32, device=self.device)                
+        #responsible_indices_noobj_1[responsible_indices, indices] = 0
+
+        return responsible_indices, responsible_indices_1, responsible_indices_any_1, responsible_indices_noobj_1
 
     def get_intersected_cells(self, ground_truth_boxes):
-        print("self.grid_data", self.grid_data)
+        #print("self.grid_data", self.grid_data)
         intersected_cells_mask = T.empty((self.grid_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.bool, device=self.device)
-        print("intersected_cells_mask", intersected_cells_mask)
-        print("ground_truth_boxes[i,0]", ground_truth_boxes[0,0])
+        #print("intersected_cells_mask", intersected_cells_mask)
+        #print("ground_truth_boxes[i,0]", ground_truth_boxes[0,0])
         
         #boolean expression to check whether two AABBs intersect
         #rect_a.left <= rect_b.right && 
@@ -519,9 +540,9 @@ class Yolo(BasicNetwork):
         intersected_cells_1[intersected_cells_mask] = 1
         intersected_cells_1_any_box = T.max(intersected_cells_1, dim=1).values
         intersected_cells_1_any_box = T.reshape(intersected_cells_1_any_box, (self.S*self.S, 1))
-        print("intersected_cells_mask", intersected_cells_mask)
-        print("intersected_cells_1", intersected_cells_1)
-        print("intersected_cells_1_any_box", intersected_cells_1_any_box)
+        #print("intersected_cells_mask", intersected_cells_mask)
+        #print("intersected_cells_1", intersected_cells_1)
+        #print("intersected_cells_1_any_box", intersected_cells_1_any_box)
         #print("col", col.shape)
         return intersected_cells_mask, intersected_cells_1, intersected_cells_1_any_box
 
@@ -539,7 +560,7 @@ class Yolo(BasicNetwork):
         class_probability_map = converted_box_data[:self.S*self.S, 5:]
         return class_probability_map
 
-    def get_loss(self, device, converted_box_data, ground_truth_boxes, ground_truth_label):
+    def get_loss(self, device, converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord = 5, lambda_noobj = 0.5):
         """
         Calculates loss for a single image.
 
@@ -551,40 +572,110 @@ class Yolo(BasicNetwork):
         In this task there is only one label for all boxes of an image     
         """
         print("get_loss")
-        print("converted_box_data", converted_box_data[:,0:5])
-        print("ground_truth_boxes", ground_truth_boxes)
         #extract data
-        responsible_indices, responsible_indices_1 = self.get_responsible_indices(converted_box_data, ground_truth_boxes)
+        responsible_indices, responsible_indices_1, responsible_indices_any_1, responsible_indices_noobj_1 = self.get_responsible_indices(converted_box_data, ground_truth_boxes)
         intersected_cells_mask, intersected_cells_1, intersected_cells_1_any_box = self.get_intersected_cells(ground_truth_boxes)
         class_probability_map = self.get_class_probability_map(converted_box_data)
+        print("ground_truth_boxes", ground_truth_boxes)
+        print("converted_box_data[responsible_indices]", converted_box_data[responsible_indices])
+        #ground_truth_boxes: (x1, y1, x2, y2)
+        ground_truth_boxes_x1 = ground_truth_boxes[:,0]
+        ground_truth_boxes_y1 = ground_truth_boxes[:,1]
+        ground_truth_boxes_x2 = ground_truth_boxes[:,2]
+        ground_truth_boxes_y2 = ground_truth_boxes[:,3]
+        #converted_box_data
+        converted_box_data_x1 = converted_box_data[:,0]
+        converted_box_data_y1 = converted_box_data[:,1]
+        converted_box_data_x2 = converted_box_data[:,2]
+        converted_box_data_y2 = converted_box_data[:,3]
+        converted_box_data_c = converted_box_data[:,4]
+        #reshape for broadcasting
+        converted_box_data_x1 = T.reshape(converted_box_data_x1, (*converted_box_data_x1.shape, 1))
+        converted_box_data_y1 = T.reshape(converted_box_data_y1, (*converted_box_data_y1.shape, 1))
+        converted_box_data_x2 = T.reshape(converted_box_data_x2, (*converted_box_data_x2.shape, 1))
+        converted_box_data_y2 = T.reshape(converted_box_data_y2, (*converted_box_data_y2.shape, 1))
+        converted_box_data_c = T.reshape(converted_box_data_c, (*converted_box_data_c.shape, 1))
 
         #calculate loss
-        part_1 = 0
-        part_2 = 0
-        part_3 = 0
-        part_4 = 0
+
+        #PART 1: box position error
+        #the loss function might be using coordinates relative to the cell
+        #we use coordinates relative to the image, resulting in a smaller loss
+        #we therefore need to multiply the coordinate differences by the number of boxes (S)
+        #but instead of multiplying each difference, it is enough to multiply the result by 
+        #lambda_scale = S*S
+        #since ((a*x)^2 + (a*y)^2) = a^2*(x^2 + y^2)
+        lambda_scale = self.S * self.S
+        box_position_errors = responsible_indices_1 * (
+            T.square(ground_truth_boxes_x1 - converted_box_data_x1) + 
+            T.square(ground_truth_boxes_y1 - converted_box_data_y1)
+        )
+        part_1 = lambda_coord * lambda_scale * T.sum(box_position_errors)   
+
+        
+        #PART 2: box dimension error
+        box_dimension_errors = responsible_indices_1 * (
+            T.square(
+                T.sqrt(ground_truth_boxes_x2-ground_truth_boxes_x1) - 
+                T.sqrt(converted_box_data_x2-converted_box_data_x1)
+            ) + 
+            T.square(
+                T.sqrt(ground_truth_boxes_y2-ground_truth_boxes_y1) - 
+                T.sqrt(converted_box_data_y2-converted_box_data_y1)
+            )
+        )
+        print("box_dimension_errors", box_dimension_errors)
+        part_2 = lambda_coord * T.sum(box_dimension_errors)   
+
+
+        #PART 3: box confidence error (non empty cells)
+        #here we can use responsible_indices_any_1 instead of responsible_indices_1
+        #since we do not care about which ground truth box the box is responsible for
+        box_confidence_errors = responsible_indices_any_1 * (
+            T.square(1 - converted_box_data_c)
+        )
+        print("box_confidence_errors", box_confidence_errors)
+        part_3 = T.sum(box_confidence_errors)   
+
+        
+        #PART 4: box confidence error (empty cells)
+        box_noobj_confidence_errors = responsible_indices_noobj_1 * (
+            T.square(0 - converted_box_data_c)
+        )
+        print("box_noobj_confidence_errors", box_noobj_confidence_errors)
+        part_4 = lambda_noobj * T.sum(box_noobj_confidence_errors)
 
 
         #PART 5: classification error
-        #part_5 = intersected_cells_1 
-        squared_difference = intersected_cells_1_any_box * T.square(ground_truth_label - class_probability_map) 
-        #print("squared_difference", squared_difference)  
-        part_5 = T.sum(squared_difference)   
+        classification_errors = intersected_cells_1_any_box * T.square(ground_truth_label - class_probability_map) 
+        print("classification_errors", classification_errors)  
+        part_5 = T.sum(classification_errors)   
 
-
-        #combine parts
         print("part_1", part_1)  
         print("part_2", part_2)  
         print("part_3", part_3)  
         print("part_4", part_4)  
         print("part_5", part_5)  
-        total_loss = part_1 + part_2 + part_3 + part_4 + part_5
+        print("responsible_indices_1.shape", responsible_indices_1.shape)  
+        print("responsible_indices_any_1.shape", responsible_indices_any_1.shape)  
+        print("responsible_indices_noobj_1.shape", responsible_indices_noobj_1.shape) 
 
-        
-        print("responsible_indices_1", responsible_indices_1)  
+        #combine parts 
+        total_loss = part_1 + part_2 + part_3 + part_4 + part_5
+        print("total_loss", total_loss)  
         return total_loss
 
         """
+        print("box_position_errors", box_position_errors)
+
+        #print("ground_truth_boxes_x1", ground_truth_boxes_x1)
+        #print("ground_truth_boxes_y1", ground_truth_boxes_y1)
+        #print("ground_truth_boxes_x2", ground_truth_boxes_x2)
+        #print("ground_truth_boxes_y2", ground_truth_boxes_y2)
+        print("responsible_indices_1.shape", responsible_indices_1.shape)
+        print("ground_truth_boxes_x1.shape", ground_truth_boxes_x1.shape)
+        print("converted_box_data_x1.shape", converted_box_data_x1.shape)
+
         print("class_probability_map", class_probability_map)
         print("class_probability_map.shape", class_probability_map.shape)
         print("intersected_cells_1", intersected_cells_1)      
