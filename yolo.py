@@ -610,6 +610,7 @@ class Yolo(BasicNetwork):
             T.square(ground_truth_boxes_x1 - converted_box_data_x1) + 
             T.square(ground_truth_boxes_y1 - converted_box_data_y1)
         )
+        print("box_position_errors", box_position_errors)
         part_1 = lambda_coord * lambda_scale * T.sum(box_position_errors)   
 
         
@@ -664,30 +665,3 @@ class Yolo(BasicNetwork):
         total_loss = part_1 + part_2 + part_3 + part_4 + part_5
         print("total_loss", total_loss)  
         return total_loss
-
-        """
-        print("box_position_errors", box_position_errors)
-
-        #print("ground_truth_boxes_x1", ground_truth_boxes_x1)
-        #print("ground_truth_boxes_y1", ground_truth_boxes_y1)
-        #print("ground_truth_boxes_x2", ground_truth_boxes_x2)
-        #print("ground_truth_boxes_y2", ground_truth_boxes_y2)
-        print("responsible_indices_1.shape", responsible_indices_1.shape)
-        print("ground_truth_boxes_x1.shape", ground_truth_boxes_x1.shape)
-        print("converted_box_data_x1.shape", converted_box_data_x1.shape)
-
-        print("class_probability_map", class_probability_map)
-        print("class_probability_map.shape", class_probability_map.shape)
-        print("intersected_cells_1", intersected_cells_1)      
-        print("intersected_cells_1_any_box", intersected_cells_1_any_box)      
-        print("ground_truth_label", ground_truth_label)    
-
-        print("responsible_indices", responsible_indices)
-        print("intersected_cells_mask", intersected_cells_mask)
-        print("intersected_cells_1", intersected_cells_1)        
-        print("responsible_indices.shape", responsible_indices.shape)
-        print("intersected_cells_mask.shape", intersected_cells_mask.shape)
-        print("intersected_cells_1.shape", intersected_cells_1.shape)
-        print("class_probability_map", class_probability_map)
-        print("class_probability_map.shape", class_probability_map.shape)
-        """
