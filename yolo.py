@@ -470,10 +470,26 @@ class Yolo(BasicNetwork):
         return correct_indices, filtered_converted_box_data, filtered_grid_data
 
     def get_responsible_indices(self, converted_box_data, ground_truth_boxes):
+        """
+        Identify which boxes are responsible.
+
+        :param batch_index: the index in this batch.
+
+        :param input_tensor: the input tensor with shape identical to the output of the forward method
+        (batch_size, S, S, B*5+C).
+
+        :returns responsible_indices: the box indices responsible for each ground truth box
+        tensor in the shape (num_ground_truth_boxes)
+
+        :returns responsible_indices_1: 1 or 0 for each (box, ground_truth_box) pair
+        tensor in the shape (num_boxes, num_ground_truth_boxes)
+        """
         iou = torchvision.ops.box_iou(converted_box_data[:,0:4], ground_truth_boxes)
         responsible_indices = T.argmax(iou, dim=0)
-        responsible_indices_1 = T.zeros((converted_box_data.shape[0], 1), dtype=T.float32, device=self.device)
-        responsible_indices_1[responsible_indices] = 1
+        indices = T.arange(0, responsible_indices.shape[0], dtype=T.long)
+        responsible_indices_1 = T.zeros((converted_box_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.float32, device=self.device)
+                        
+        responsible_indices_1[responsible_indices, indices] = 1
         return responsible_indices, responsible_indices_1
 
     def get_intersected_cells(self, ground_truth_boxes):
