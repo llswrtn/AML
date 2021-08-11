@@ -499,25 +499,83 @@ class Yolo(BasicNetwork):
         #col = np.empty((self.grid_data.shape[0], self.ground_truth_boxes.shape[0]))
         intersected_cells_1 = T.zeros_like(intersected_cells_mask, dtype=T.float32, device=self.device)
         intersected_cells_1[intersected_cells_mask] = 1
+        intersected_cells_1_any_box = T.max(intersected_cells_1, dim=1).values
+        intersected_cells_1_any_box = T.reshape(intersected_cells_1_any_box, (self.S*self.S, 1))
         print("intersected_cells_mask", intersected_cells_mask)
         print("intersected_cells_1", intersected_cells_1)
+        print("intersected_cells_1_any_box", intersected_cells_1_any_box)
         #print("col", col.shape)
-        return intersected_cells_mask, intersected_cells_1
+        return intersected_cells_mask, intersected_cells_1, intersected_cells_1_any_box
 
-    def get_loss(self, device, converted_box_data, ground_truth_boxes):
+    def get_class_probability_map(self, converted_box_data):
+        """
+        Generates the class probability map containing, for each grid cell, the probability for each class.
+
+        :param converted_box_data: the boxes obtained from prepare_data.
+
+        :returns  class_probability_map: tensor of shape (S*S, C)
+        """
+        #since predicted classes are identical for each box of a cell, we only need S*S boxes
+        #we also need to discard the first 5 values of those boxes, since they are used for
+        #coordinates and box confidence
+        class_probability_map = converted_box_data[:self.S*self.S, 5:]
+        return class_probability_map
+
+    def get_loss(self, device, converted_box_data, ground_truth_boxes, ground_truth_label):
         """
         Calculates loss for a single image.
 
         :param converted_box_data: the boxes obtained from prepare_data.
 
         :param ground_truth_boxes: the ground truth boxes.
+
+        :param ground_truth_label: the one hot encoded ground truth label.
+        In this task there is only one label for all boxes of an image     
         """
         print("get_loss")
         print("converted_box_data", converted_box_data[:,0:5])
         print("ground_truth_boxes", ground_truth_boxes)
-        iou = torchvision.ops.box_iou(converted_box_data[:,0:4], ground_truth_boxes)
-        responsible_indices = T.argmax(iou, dim=0)
-        print("iou", iou)
+        #extract data
+        responsible_indices = self.get_responsible_indices(converted_box_data, ground_truth_boxes)
+        intersected_cells_mask, intersected_cells_1, intersected_cells_1_any_box = self.get_intersected_cells(ground_truth_boxes)
+        class_probability_map = self.get_class_probability_map(converted_box_data)
+
+        #calculate loss
+        part_1 = 0
+        part_2 = 0
+        part_3 = 0
+        part_4 = 0
+
+
+        #PART 5: classification error
+        #part_5 = intersected_cells_1 
+        squared_difference = intersected_cells_1_any_box * T.square(ground_truth_label - class_probability_map) 
+        #print("squared_difference", squared_difference)  
+        part_5 = T.sum(squared_difference)   
+
+
+        #combine parts
+        print("part_1", part_1)  
+        print("part_2", part_2)  
+        print("part_3", part_3)  
+        print("part_4", part_4)  
+        print("part_5", part_5)  
+        total_loss = part_1 + part_2 + part_3 + part_4 + part_5
+        return total_loss
+
+        """
+        print("class_probability_map", class_probability_map)
+        print("class_probability_map.shape", class_probability_map.shape)
+        print("intersected_cells_1", intersected_cells_1)      
+        print("intersected_cells_1_any_box", intersected_cells_1_any_box)      
+        print("ground_truth_label", ground_truth_label)    
+
         print("responsible_indices", responsible_indices)
-        intersected_cells = self.get_intersected_cells(ground_truth_boxes)
-        print("intersected_cells", intersected_cells)
+        print("intersected_cells_mask", intersected_cells_mask)
+        print("intersected_cells_1", intersected_cells_1)        
+        print("responsible_indices.shape", responsible_indices.shape)
+        print("intersected_cells_mask.shape", intersected_cells_mask.shape)
+        print("intersected_cells_1.shape", intersected_cells_1.shape)
+        print("class_probability_map", class_probability_map)
+        print("class_probability_map.shape", class_probability_map.shape)
+        """

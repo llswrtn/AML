@@ -147,12 +147,15 @@ def test_loss(device, yolo):
         [0.6, 0.6, 0.8, 0.8]])
     ground_truth = T.tensor(ground_truth, dtype=T.float32, device=device)
 
+    ground_truth_label = np.array([0, 0, 1, 0])
+    ground_truth_label = T.tensor(ground_truth_label, dtype=T.float32, device=device)
+
     #simulate forward
     dummy_forward_result = T.tensor(data, dtype=T.float32, device=device)
     #convert result of forward
     converted_box_data = yolo.prepare_data(0, dummy_forward_result, device=device)
     #call loss function for one image
-    yolo.get_loss(device, converted_box_data, ground_truth)
+    yolo.get_loss(device, converted_box_data, ground_truth, ground_truth_label)
 
 def run_tests(device, data_wrapper_images):
     print("running tests...")
@@ -160,7 +163,7 @@ def run_tests(device, data_wrapper_images):
     test_iou(device)
     yolo = Yolo(number_of_classes=4, boxes_per_cell=2).to(device)
     yolo.initialize(device)
-    test_get_intersected_cells(device, yolo)
+    #test_get_intersected_cells(device, yolo)
     #test_get_responsible_indices(device, yolo)
     test_loss(device, yolo)
     #test_yolo(device, yolo)
