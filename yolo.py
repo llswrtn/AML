@@ -472,7 +472,9 @@ class Yolo(BasicNetwork):
     def get_responsible_indices(self, converted_box_data, ground_truth_boxes):
         iou = torchvision.ops.box_iou(converted_box_data[:,0:4], ground_truth_boxes)
         responsible_indices = T.argmax(iou, dim=0)
-        return responsible_indices
+        responsible_indices_1 = T.zeros((converted_box_data.shape[0], 1), dtype=T.float32, device=self.device)
+        responsible_indices_1[responsible_indices] = 1
+        return responsible_indices, responsible_indices_1
 
     def get_intersected_cells(self, ground_truth_boxes):
         print("self.grid_data", self.grid_data)
@@ -536,7 +538,7 @@ class Yolo(BasicNetwork):
         print("converted_box_data", converted_box_data[:,0:5])
         print("ground_truth_boxes", ground_truth_boxes)
         #extract data
-        responsible_indices = self.get_responsible_indices(converted_box_data, ground_truth_boxes)
+        responsible_indices, responsible_indices_1 = self.get_responsible_indices(converted_box_data, ground_truth_boxes)
         intersected_cells_mask, intersected_cells_1, intersected_cells_1_any_box = self.get_intersected_cells(ground_truth_boxes)
         class_probability_map = self.get_class_probability_map(converted_box_data)
 
@@ -561,6 +563,9 @@ class Yolo(BasicNetwork):
         print("part_4", part_4)  
         print("part_5", part_5)  
         total_loss = part_1 + part_2 + part_3 + part_4 + part_5
+
+        
+        print("responsible_indices_1", responsible_indices_1)  
         return total_loss
 
         """
