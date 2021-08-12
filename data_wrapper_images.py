@@ -10,7 +10,8 @@ from tqdm import tqdm
 class DataWrapperImages:
     """
     Allows access to the train, validation, and test data via a batch index.
-    - Simply call split_train_validation_test to split the data.
+    - Call load_data_set to load the data.
+    - Call split_train_validation_test to split the data for taining, validation, and testing.
     - Afterwards call get_train_batch, get_validation_batch, or get_test_batch
         to get all the required data of the respective batch.
     - The number of allowed batches can be obtained via get_num_train_batches, 
@@ -30,8 +31,6 @@ class DataWrapperImages:
         self.num_total_images = len(self.data_frame.index)
 
         self.generate_path_lists()
-
-        self.load_data_set()
 
     def generate_path_lists(self):
         print("generate path lists...")
