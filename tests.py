@@ -14,13 +14,15 @@ from PIL import Image
 
 
 def test_yolo(device, yolo):
-    data = np.zeros((3,448,448))
-    data = data.reshape(1, *data.shape)
+    #data = np.zeros((3,448,448))
+    #data = data.reshape(1, *data.shape)
     data = np.random.rand(2,1,448,448)
     input_tensor = T.tensor(data, dtype=T.float32, device=device)
     output_tensor = yolo(input_tensor)
-    #print(output_tensor)
+    print("output_tensor", output_tensor)
     print(output_tensor.shape)
+    print("output_tensor", output_tensor[0,0,0])
+    print("output_tensor", output_tensor[0,0,1])
     #yolo.save("save.pt")#--> 1GB
 
 def test_to_converted_box_data(yolo):
@@ -166,7 +168,7 @@ def run_tests(device, data_wrapper_images):
     #test_get_intersected_cells(device, yolo)
     #test_get_responsible_indices(device, yolo)
     test_loss(device, yolo)
-    #test_yolo(device, yolo)
+    test_yolo(device, yolo)
     #test_non_max_suppression(device, yolo)
     #test_to_converted_box_data(yolo)
     print("tests completed")

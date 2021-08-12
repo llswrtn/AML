@@ -4,13 +4,15 @@ class Yolo(BasicNetwork):
     """
     Neural Network test
     """
-    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5):
+    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, use_sigmoid=False, use_clamp_coordinates=True):
         super(Yolo, self).__init__()        
         print("init Yolo")
         self.leaky_slope = 0.1  
         self.number_of_classes = number_of_classes
         self.boxes_per_cell = boxes_per_cell
         self.dropout_p = dropout_p
+        self.use_sigmoid = use_sigmoid
+        self.use_clamp_coordinates = use_clamp_coordinates
         #alternative names for easier use
         self.B = boxes_per_cell
         self.C = number_of_classes        
@@ -253,6 +255,7 @@ class Yolo(BasicNetwork):
     def initialize(self, device):
         self.device = device
         self.generate_grid_data()
+        self.generate_clamp_index_list()
 
     def generate_grid_data(self):
         """
@@ -282,6 +285,15 @@ class Yolo(BasicNetwork):
 
         self.grid_data = data.to(self.device)
         self.stacked_grid_data = stacked_data.to(self.device)
+
+    def generate_clamp_index_list(self):
+        box_indices = T.arange(self.B)
+        box_indices = T.reshape(box_indices, (*box_indices.shape, 1))
+        coord_offsets = T.arange(2)
+        coord_offsets = T.reshape(coord_offsets, (1, *coord_offsets.shape))
+
+        self.clamp_index_list = 5 * box_indices + coord_offsets
+        self.clamp_index_list = T.flatten(self.clamp_index_list).to(self.device)
 
     def forward(self, x):     
         #print("forward:", x.size())
@@ -349,12 +361,22 @@ class Yolo(BasicNetwork):
         x = F.leaky_relu(self.layer_29_dropout(x), negative_slope=self.leaky_slope)
         self.print_debug("layer_29_dropout", x.size())
         
-        #last layer uses relu instead of leaky_relu
-        x = F.relu(self.layer_30_full(x))
+        #last layer:
+        #in the paper, the last layer uses linear activation instead of leaky_relu
+        #alternatively we allow sigmoid
+        x = F.sigmoid(self.layer_30_full(x)) if self.use_sigmoid else self.layer_30_full(x)
         self.print_debug("layer_30_full", x.size())
 
         #reshape tensor
         x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
+        self.print_debug("reshaped", x.size())
+
+        #in the paper, the last layer uses linear activation instead of leaky_relu
+        #in the case of linear activation the boxes can leave their cells
+        #we allow to clamp the box coordinates to make sure the box centers stay in their cells
+        if self.use_clamp_coordinates:
+            x[:,:,:,self.clamp_index_list] = T.clamp(x[:,:,:,self.clamp_index_list], 0, 1)         
+
         return x
 
     def to_separate_box_data(self, batch_index, input_tensor):
