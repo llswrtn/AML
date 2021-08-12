@@ -37,7 +37,7 @@ if __name__ == "__main__":
     #endregion
 
     data_wrapper_images = DataWrapperImages(data_path, data_path_448)
-    #data_wrapper_images.load_data_set()
+    data_wrapper_images.load_data_set()
     run_tests(device, data_wrapper_images)
 
     """
