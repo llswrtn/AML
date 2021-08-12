@@ -31,25 +31,38 @@ class DataWrapperImages:
 
         self.generate_path_lists()
 
-        self.generate_image_size_list()
-
         self.load_data_set()
 
     def generate_path_lists(self):
+        print("generate path lists...")
         self.path_list = [None] * self.num_total_images
         self.path_448_list = [None] * self.num_total_images
 
-        for i in range(self.num_total_images):
+        for i in tqdm(range(self.num_total_images)):
             self.path_list[i] = self.get_image_path(i, True)
             self.path_448_list[i] = self.get_image_path(i, False)
     
-    def generate_image_size_list(self):
+    def load_data_set(self):
+        print("load data set...")
+        self.load_data_set_image_size_list()
+        self.load_data_set_images()
+        self.load_data_set_boxes()
+        self.load_data_set_labels()   
+        print("load data completed")
+        
+        #print(self.images_448)
+        #print(self.images_448.shape)
+        #print(self.ground_truth_boxes_list)
+        #print(self.ground_truth_boxes_list.shape)
+
+    def load_data_set_image_size_list(self):
         """
         Tries to load the list of image sizes from the data path.
         - If the file does exist, the sizes are loaded from the file
         - If the file does not exist, the image sizes are obtained
             from the dicom images. Afterwards the file is saved.
         """
+        print("load data set image size list...")
         path_image_sizes = os.path.join(self.data_path, "image_sizes.npy")
         if os.path.exists(path_image_sizes):
             print("load image sizes from file")
@@ -64,19 +77,6 @@ class DataWrapperImages:
                 self.image_size_list[i,1] = ds.pixel_array.shape[1]
             print("save image sizes list...")
             np.save(path_image_sizes, self.image_size_list)
-        print("image sizes list generated")
-
-    def load_data_set(self):
-        print("load data set...")
-        self.load_data_set_images()
-        self.load_data_set_boxes()
-        self.load_data_set_labels()   
-        print("load data completed")
-        
-        #print(self.images_448)
-        #print(self.images_448.shape)
-        #print(self.ground_truth_boxes_list)
-        #print(self.ground_truth_boxes_list.shape)
 
     def load_data_set_images(self):
         if(self.keep_images_in_ram):
