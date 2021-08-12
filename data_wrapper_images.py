@@ -48,7 +48,6 @@ class DataWrapperImages:
         self.load_data_set_boxes()
         self.load_data_set_labels()   
         print("load data completed")
-        
         #print(self.images_448)
         #print(self.images_448.shape)
         #print(self.ground_truth_boxes_list)
@@ -72,8 +71,8 @@ class DataWrapperImages:
             for i in tqdm(range(self.num_total_images)):
                 path = self.path_list[i]
                 ds = dicom.dcmread(path)
-                self.image_size_list[i,0] = ds.pixel_array.shape[0]
-                self.image_size_list[i,1] = ds.pixel_array.shape[1]
+                self.image_size_list[i,0] = ds.pixel_array.shape[1]
+                self.image_size_list[i,1] = ds.pixel_array.shape[0]
             print("save image sizes list...")
             np.save(path_image_sizes, self.image_size_list)
 
@@ -107,7 +106,7 @@ class DataWrapperImages:
                     boxes_data[j,0] = x
                     boxes_data[j,1] = y
                     boxes_data[j,2] = x+w
-                    boxes_data[j,3] = y+h      
+                    boxes_data[j,3] = y+h
                 self.ground_truth_boxes_list[i] = boxes_data
 
     def load_data_set_labels(self):

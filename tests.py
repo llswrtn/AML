@@ -173,6 +173,7 @@ def test_data(data_wrapper_images):
     print("batch_images.shape", batch_images.shape)
     print("len(batch_boxes)", len(batch_boxes))
     print("batch_labels.shape", batch_labels.shape)
+    #print(data_wrapper_images.image_size_list)
     #test_batch = data_wrapper_images.get_test_batch(1, batch_size) 
     #print("test_batch", test_batch)
     #test_batch = data_wrapper_images.get_test_batch(78, batch_size) 
