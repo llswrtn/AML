@@ -159,9 +159,30 @@ def test_loss(device, yolo):
     #call loss function for one image
     yolo.get_loss(device, converted_box_data, ground_truth, ground_truth_label)
 
+def test_data(data_wrapper_images):    
+    print("test_data")
+    data_wrapper_images.split_train_validation_test(p_train=0.8, p_validation=0.1, seed=1)
+
+    batch_size = 8
+    num_test_batches = data_wrapper_images.get_num_test_batches(batch_size) 
+    print("num_test_batches", num_test_batches)
+    batch_images, batch_boxes, batch_labels = data_wrapper_images.get_test_batch(0, batch_size) 
+    print("batch_images", batch_images)
+    print("batch_boxes", batch_boxes)
+    print("batch_labels", batch_labels)
+    print("batch_images.shape", batch_images.shape)
+    print("len(batch_boxes)", len(batch_boxes))
+    print("batch_labels.shape", batch_labels.shape)
+    #test_batch = data_wrapper_images.get_test_batch(1, batch_size) 
+    #print("test_batch", test_batch)
+    #test_batch = data_wrapper_images.get_test_batch(78, batch_size) 
+    #print("test_batch", test_batch)
+
 def run_tests(device, data_wrapper_images):
     print("running tests...")
+    test_data(data_wrapper_images)
     data_wrapper_images.test_get_image_path()
+    sys.exit(0)
     test_iou(device)
     yolo = Yolo(number_of_classes=4, boxes_per_cell=2).to(device)
     yolo.initialize(device)
