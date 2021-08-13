@@ -31,7 +31,7 @@ class YoloImageBased(Yolo):
             y = x[:, :self.C]
             x = x[:, self.C:]
             x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
-            x[:,:,:,self.clamp_index_list] = T.clamp(x[:,:,:,self.clamp_index_list], 0, 1) 
+            x[:,:,:,self.coordinate_index_list] = T.clamp(x[:,:,:,self.coordinate_index_list], 0, 1) 
             x = T.reshape(x, (x.shape[0], self.S*self.S*self.values_per_cell))  
             x = T.cat((y, x), dim=1)
             return x
@@ -40,7 +40,7 @@ class YoloImageBased(Yolo):
             y = x[:, :self.C]
             x = x[:, self.C:]
             x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
-            x[:,:,:,self.clamp_index_list] = F.sigmoid(x[:,:,:,self.clamp_index_list])
+            x[:,:,:,self.coordinate_index_list] = F.sigmoid(x[:,:,:,self.coordinate_index_list])
             x = T.reshape(x, (x.shape[0], self.S*self.S*self.values_per_cell))  
             x = T.cat((y, x), dim=1)
             return x

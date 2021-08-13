@@ -292,7 +292,7 @@ class Yolo(BasicNetwork):
     def initialize(self, device):
         self.device = device
         self.generate_grid_data()
-        self.generate_clamp_index_list()
+        self.generate_coordinate_index_list()
 
     def generate_grid_data(self):
         """
@@ -323,14 +323,14 @@ class Yolo(BasicNetwork):
         self.grid_data = data.to(self.device)
         self.stacked_grid_data = stacked_data.to(self.device)
 
-    def generate_clamp_index_list(self):
+    def generate_coordinate_index_list(self):
         box_indices = T.arange(self.B)
         box_indices = T.reshape(box_indices, (*box_indices.shape, 1))
         coord_offsets = T.arange(2)
         coord_offsets = T.reshape(coord_offsets, (1, *coord_offsets.shape))
 
-        self.clamp_index_list = 5 * box_indices + coord_offsets
-        self.clamp_index_list = T.flatten(self.clamp_index_list).to(self.device)
+        self.coordinate_index_list = 5 * box_indices + coord_offsets
+        self.coordinate_index_list = T.flatten(self.coordinate_index_list).to(self.device)
 
     def forward(self, x):     
         #print("forward:", x.size())

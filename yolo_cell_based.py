@@ -29,11 +29,11 @@ class YoloCellBased(Yolo):
 
         #in the case of linear activation, we also allow clamping of the coordinates to [0,1]
         if self.activation_mode == ACTIVATION_MODE_CLAMP_COORDINATES:
-            x[:,:,:,self.clamp_index_list] = T.clamp(x[:,:,:,self.clamp_index_list], 0, 1) 
+            x[:,:,:,self.coordinate_index_list] = T.clamp(x[:,:,:,self.coordinate_index_list], 0, 1) 
             return x
         #we also allow sigmoid only for coordinates and linear activation for all other values
         if self.activation_mode == ACTIVATION_MODE_SIGMOID_COORDINATES:            
-            x[:,:,:,self.clamp_index_list] = F.sigmoid(x[:,:,:,self.clamp_index_list])
+            x[:,:,:,self.coordinate_index_list] = F.sigmoid(x[:,:,:,self.coordinate_index_list])
             return x
 
         print("ERROR UNKNOWN activation_mode", self.activation_mode)
