@@ -1,10 +1,22 @@
 from basic_network import *
 
+"""
+IOU_MODE_ALL: each ground truth box has exactly one prediction that is responsible for it.
+In this mode, the responsible box is the box with highest IOU of all S*S*B boxes.
+"""
+IOU_MODE_ALL = 0
+"""
+IOU_MODE_BOX_CENTER: each ground truth box has exactly one prediction that is responsible for it.
+In this mode, the responsible box is the box with highest IOU of all B boxes that are in the grid cell
+where the center of the ground truth box falls into.
+"""
+IOU_MODE_BOX_CENTER = 1
+
 class Yolo(BasicNetwork):
     """
     Neural Network test
     """
-    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, use_sigmoid=False, use_clamp_coordinates=True):
+    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, use_sigmoid=False, use_clamp_coordinates=True, iou_mode=IOU_MODE_ALL):
         super(Yolo, self).__init__()        
         print("init Yolo")
         self.leaky_slope = 0.1  
@@ -13,6 +25,7 @@ class Yolo(BasicNetwork):
         self.dropout_p = dropout_p
         self.use_sigmoid = use_sigmoid
         self.use_clamp_coordinates = use_clamp_coordinates
+        self.iou_mode = iou_mode
         #alternative names for easier use
         self.B = boxes_per_cell
         self.C = number_of_classes        
@@ -509,8 +522,18 @@ class Yolo(BasicNetwork):
         the paper mentions that they 'decrease the loss from confidence predictions for boxes that don't contain objects',
         so we interpret this as the inverted responsible_indices_any_1, but we are unsure if this is correct
         """
-        iou = torchvision.ops.box_iou(converted_box_data[:,0:4], ground_truth_boxes)
-        responsible_indices = T.argmax(iou, dim=0)
+        responsible_indices = None
+        if self.iou_mode == IOU_MODE_ALL:
+            iou = torchvision.ops.box_iou(converted_box_data[:,0:4], ground_truth_boxes)
+            responsible_indices = T.argmax(iou, dim=0)
+        elif self.iou_mode == IOU_MODE_BOX_CENTER:
+            pass
+        else:
+            print("unknown iou mode")
+            sys.exit(1)
+
+
+
         indices = T.arange(0, responsible_indices.shape[0], dtype=T.long)
         
         responsible_indices_1 = T.zeros((converted_box_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.float32, device=self.device)                
@@ -561,6 +584,38 @@ class Yolo(BasicNetwork):
         #print("intersected_cells_1_any_box", intersected_cells_1_any_box)
         #print("col", col.shape)
         return intersected_cells_mask, intersected_cells_1, intersected_cells_1_any_box
+
+    def get_responsible_cells(self, ground_truth_boxes):
+        #print("self.grid_data", self.grid_data)
+        responsible_cells_mask = T.zeros((self.grid_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.bool, device=self.device)
+        #print("intersected_cells_mask", intersected_cells_mask)
+        #print("ground_truth_boxes[i,0]", ground_truth_boxes[0,0])
+        
+        #boolean expression to check whether two AABBs intersect
+        #rect_a.left <= rect_b.right && 
+        #rect_a.right >= rect_b.left &&
+        #rect_a.top >= rect_b.bottom && 
+        #rect_a.bottom <= rect_b.top
+
+        print(responsible_cells_mask)
+        cell_size = 1 / self.S
+        #let rect_a be the ground_truth_boxes and rect_b be the grid_data
+        #ground_truth_boxes: (x1, y1, x2, y2)
+        #grid_data: (grid x index, grid y index, cell min x, cell max x, cell min y, cell max y)
+        for i in range(ground_truth_boxes.shape[0]):
+            x = (ground_truth_boxes[i,0] + ground_truth_boxes[i,2]) / 2
+            y = (ground_truth_boxes[i,1] + ground_truth_boxes[i,3]) / 2
+            x_index = int(x / cell_size)
+            y_index = int(y / cell_size)
+            cell_index = x_index + y_index * self.S
+            responsible_cells_mask[cell_index, i] = True
+
+        print(responsible_cells_mask)
+        #col = np.empty((self.grid_data.shape[0], self.ground_truth_boxes.shape[0]))
+        responsible_cells_1 = T.zeros_like(responsible_cells_mask, dtype=T.float32, device=self.device)
+        responsible_cells_1[responsible_cells_mask] = 1
+        print(responsible_cells_1)
+        return responsible_cells_mask, responsible_cells_1
 
     def get_class_probability_map(self, converted_box_data):
         """

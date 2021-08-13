@@ -142,6 +142,16 @@ def test_get_intersected_cells(device, yolo):
     #plot
     plot_intersected_cells_and_ground_truth(intersected_cells_mask, yolo.grid_data, ground_truth_boxes)
 
+def test_get_responsible_cells(device, yolo):
+    ground_truth_boxes = np.array([
+        [0.2, 0.2, 0.4, 0.4], 
+        [0.6, 0.6, 0.8, 0.8]])
+    ground_truth_boxes = T.tensor(ground_truth_boxes, dtype=T.float32, device=device)
+
+    responsible_cells_mask, responsible_cells_1 = yolo.get_responsible_cells(ground_truth_boxes)
+    #plot
+    plot_intersected_cells_and_ground_truth(responsible_cells_mask, yolo.grid_data, ground_truth_boxes)
+
 def test_loss(device, yolo):
     np.random.seed(1)
     data = np.random.rand(64,yolo.S,yolo.S,yolo.values_per_cell)
@@ -190,9 +200,10 @@ def run_tests(device, data_wrapper_images):
     yolo = Yolo(number_of_classes=4, boxes_per_cell=2).to(device)
     yolo.initialize(device)
     #test_get_intersected_cells(device, yolo)
+    test_get_responsible_cells(device, yolo)
     #test_get_responsible_indices(device, yolo)
-    #test_loss(device, yolo)
+    test_loss(device, yolo)
     #test_yolo(device, yolo)
-    test_non_max_suppression(device, yolo)
+    #test_non_max_suppression(device, yolo)
     #test_to_converted_box_data(yolo)
     print("tests completed")
