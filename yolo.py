@@ -14,11 +14,19 @@ Each ground truth box has exactly one prediction that is responsible for it.
 IOU_MODE_ALL = 0
 IOU_MODE_BOX_CENTER = 1
 
+OUT_MODE_CELL_BASED_CLASS_PREDICTION = 0
+OUT_MODE_IMAGE_BASED_CLASS_PREDICTION = 1
+
+ACTIVATION_MODE_LINEAR = 0
+ACTIVATION_MODE_SIGMOID = 1
+ACTIVATION_MODE_CLAMP_COORDINATES = 2
+ACTIVATION_MODE_SIGMOID_COORDINATES = 3
+
 class Yolo(BasicNetwork):
     """
     Neural Network test
     """
-    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, use_sigmoid=False, use_clamp_coordinates=True, iou_mode=IOU_MODE_BOX_CENTER):
+    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, use_sigmoid=False, use_clamp_coordinates=True, iou_mode=IOU_MODE_BOX_CENTER, out_mode=OUT_MODE_IMAGE_BASED_CLASS_PREDICTION, activation_mode=ACTIVATION_MODE_LINEAR):
         super(Yolo, self).__init__()        
         print("init Yolo")
         self.leaky_slope = 0.1  
@@ -28,12 +36,19 @@ class Yolo(BasicNetwork):
         self.use_sigmoid = use_sigmoid
         self.use_clamp_coordinates = use_clamp_coordinates
         self.iou_mode = iou_mode
+        self.out_mode = out_mode
+        self.activation_mode = activation_mode
         #alternative names for easier use
         self.B = boxes_per_cell
         self.C = number_of_classes        
         self.S = 7
         #helper variables
-        self.values_per_cell = self.B*5+self.C
+        if out_mode == OUT_MODE_CELL_BASED_CLASS_PREDICTION:
+            self.values_per_cell = self.B*5+self.C
+            self.out_layer_size = self.S*self.S*(self.values_per_cell)
+        elif out_mode == OUT_MODE_IMAGE_BASED_CLASS_PREDICTION:
+            self.values_per_cell = self.B*5
+            self.out_layer_size = self.S*self.S*(self.values_per_cell) +self.C
         #setup layers
       
 
@@ -264,7 +279,7 @@ class Yolo(BasicNetwork):
 
         #region COLUMN 7
         #Conn Layer
-        self.layer_30_full = nn.Linear(4069, self.S*self.S*(self.values_per_cell))
+        self.layer_30_full = nn.Linear(4069, self.out_layer_size)
         #endregion
 
     def initialize(self, device):
@@ -377,21 +392,49 @@ class Yolo(BasicNetwork):
         self.print_debug("layer_29_dropout", x.size())
         
         #last layer:
-        #in the paper, the last layer uses linear activation instead of leaky_relu
-        #alternatively we allow sigmoid
-        x = F.sigmoid(self.layer_30_full(x)) if self.use_sigmoid else self.layer_30_full(x)
+        #first without activation
+        x = self.layer_30_full(x)
         self.print_debug("layer_30_full", x.size())
 
-        #reshape tensor
-        x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
-        self.print_debug("reshaped", x.size())
-
         #in the paper, the last layer uses linear activation instead of leaky_relu
-        #in the case of linear activation the boxes can leave their cells
-        #we allow to clamp the box coordinates to make sure the box centers stay in their cells
-        if self.use_clamp_coordinates:
-            x[:,:,:,self.clamp_index_list] = T.clamp(x[:,:,:,self.clamp_index_list], 0, 1)         
+        if self.activation_mode == ACTIVATION_MODE_LINEAR:
+            if self.out_mode == OUT_MODE_CELL_BASED_CLASS_PREDICTION:
+                x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
+            print("return x.shape", x.shape)
+            return x
+        #alternatively we tried sigmoid
+        if self.activation_mode == ACTIVATION_MODE_SIGMOID:
+            x = F.sigmoid(x)
+            if self.out_mode == OUT_MODE_CELL_BASED_CLASS_PREDICTION:
+                x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
+            print("return x.shape", x.shape)
+            return x
+        #in the case of linear activation, we also allow clamping of the coordinates to [0,1]
+        if self.activation_mode == ACTIVATION_MODE_CLAMP_COORDINATES:
+            if self.out_mode == OUT_MODE_IMAGE_BASED_CLASS_PREDICTION:
+                y = x[:, :self.C]
+                x = x[:, self.C:]
+            x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
+            x[:,:,:,self.clamp_index_list] = T.clamp(x[:,:,:,self.clamp_index_list], 0, 1) 
+            if self.out_mode == OUT_MODE_IMAGE_BASED_CLASS_PREDICTION:
+                x = T.reshape(x, (x.shape[0], self.S*self.S*self.values_per_cell))  
+                x = T.cat((y, x), dim=1)
+            print("return x.shape", x.shape)
+            return x
+        #we also allow sigmoid only for coordinates and linear activation for all other values
+        if self.activation_mode == ACTIVATION_MODE_SIGMOID_COORDINATES:
+            if self.out_mode == OUT_MODE_IMAGE_BASED_CLASS_PREDICTION:
+                y = x[:, :self.C]
+                x = x[:, self.C:]
+            x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
+            x[:,:,:,self.clamp_index_list] = F.sigmoid(x[:,:,:,self.clamp_index_list])
+            if self.out_mode == OUT_MODE_IMAGE_BASED_CLASS_PREDICTION:
+                x = T.reshape(x, (x.shape[0], self.S*self.S*self.values_per_cell))  
+                x = T.cat((y, x), dim=1)
+            print("return x.shape", x.shape)
+            return x
 
+        print(s-5)
         return x
 
     def to_separate_box_data(self, batch_index, input_tensor):
