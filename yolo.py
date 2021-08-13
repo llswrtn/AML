@@ -553,10 +553,19 @@ class Yolo(BasicNetwork):
         return responsible_indices, responsible_indices_1, responsible_indices_any_1, responsible_indices_noobj_1
 
     def get_intersected_cells(self, ground_truth_boxes):
-        #print("self.grid_data", self.grid_data)
+        """
+        Identifies the cells intersected by each ground truth box.
+
+        :returns intersected_cells_mask: bool tensor with shape (S*S, num ground truth boxes).
+        Contains all (cell, ground truth box) pairs.
+
+        :returns intersected_cells_1: float representation of responsible_cells_mask with values 0 and 1.
+        Contains all (cell, ground truth box) pairs.
+
+        :returns intersected_cells_1_any_box: float tensor with shape (S*S, 1) with values 0 and 1.
+        1 if the cell is intersected by any of the ground truth boxes.
+        """
         intersected_cells_mask = T.empty((self.grid_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.bool, device=self.device)
-        #print("intersected_cells_mask", intersected_cells_mask)
-        #print("ground_truth_boxes[i,0]", ground_truth_boxes[0,0])
         
         #boolean expression to check whether two AABBs intersect
         #rect_a.left <= rect_b.right && 
@@ -574,32 +583,23 @@ class Yolo(BasicNetwork):
                 (ground_truth_boxes[i,3] >= self.grid_data[:,4]) & 
                 (ground_truth_boxes[i,1] <= self.grid_data[:,5]))
 
-        #col = np.empty((self.grid_data.shape[0], self.ground_truth_boxes.shape[0]))
         intersected_cells_1 = T.zeros_like(intersected_cells_mask, dtype=T.float32, device=self.device)
         intersected_cells_1[intersected_cells_mask] = 1
         intersected_cells_1_any_box = T.max(intersected_cells_1, dim=1).values
         intersected_cells_1_any_box = T.reshape(intersected_cells_1_any_box, (self.S*self.S, 1))
-        #print("intersected_cells_mask", intersected_cells_mask)
-        #print("intersected_cells_1", intersected_cells_1)
-        #print("intersected_cells_1_any_box", intersected_cells_1_any_box)
-        #print("col", col.shape)
         return intersected_cells_mask, intersected_cells_1, intersected_cells_1_any_box
 
     def get_responsible_cells(self, ground_truth_boxes):
-        #print("self.grid_data", self.grid_data)
-        responsible_cells_mask = T.zeros((self.grid_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.bool, device=self.device)
-        #print("intersected_cells_mask", intersected_cells_mask)
-        #print("ground_truth_boxes[i,0]", ground_truth_boxes[0,0])
-        
-        #boolean expression to check whether two AABBs intersect
-        #rect_a.left <= rect_b.right && 
-        #rect_a.right >= rect_b.left &&
-        #rect_a.top >= rect_b.bottom && 
-        #rect_a.bottom <= rect_b.top
+        """
+        Identifies the cells containing the center of each ground truth box.
 
-        print(responsible_cells_mask)
+        :returns responsible_cells_mask: bool tensor with shape (S*S, num ground truth boxes)
+
+        :returns responsible_cells_1: float representation of responsible_cells_mask with values 0 and 1
+        """
+        responsible_cells_mask = T.zeros((self.grid_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.bool, device=self.device)
+
         cell_size = 1 / self.S
-        #let rect_a be the ground_truth_boxes and rect_b be the grid_data
         #ground_truth_boxes: (x1, y1, x2, y2)
         #grid_data: (grid x index, grid y index, cell min x, cell max x, cell min y, cell max y)
         for i in range(ground_truth_boxes.shape[0]):
@@ -610,11 +610,8 @@ class Yolo(BasicNetwork):
             cell_index = x_index + y_index * self.S
             responsible_cells_mask[cell_index, i] = True
 
-        print(responsible_cells_mask)
-        #col = np.empty((self.grid_data.shape[0], self.ground_truth_boxes.shape[0]))
         responsible_cells_1 = T.zeros_like(responsible_cells_mask, dtype=T.float32, device=self.device)
         responsible_cells_1[responsible_cells_mask] = 1
-        print(responsible_cells_1)
         return responsible_cells_mask, responsible_cells_1
 
     def get_class_probability_map(self, converted_box_data):
