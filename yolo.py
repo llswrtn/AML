@@ -49,13 +49,13 @@ class Yolo(BasicNetwork):
         self.dropout_p = dropout_p
         self.iou_mode = iou_mode
         self.activation_mode = activation_mode
+        self.clamp_box_dimensions = clamp_box_dimensions  
         #alternative names for easier use
         self.B = boxes_per_cell
         self.C = number_of_classes        
         self.S = 7
         #helper variables
-        self.init_helper_variables()
-        self.clamp_box_dimensions = clamp_box_dimensions     
+        self.init_helper_variables()   
         #setup layers
       
 
