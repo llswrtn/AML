@@ -670,10 +670,17 @@ class Yolo(BasicNetwork):
         :param ground_truth_label: the one hot encoded ground truth label.
         In this task there is only one label for all boxes of an image     
         """
-        #if there are no boxes,
+        #if there are no boxes, only penalize confidence of all boxes
         if ground_truth_boxes is None:
-            class_probability_map = self.get_class_probability_map(converted_box_data)
-            return 0
+            converted_box_data_c = converted_box_data[:,4]
+            #PART 4: box confidence error (empty cells)
+            box_noobj_confidence_errors = (
+                T.square(0 - converted_box_data_c)
+            )
+            print("box_noobj_confidence_errors", box_noobj_confidence_errors)
+            part_4 = lambda_noobj * T.sum(box_noobj_confidence_errors)
+            print("part_4", part_4)
+            return part_4
 
         #extract data
         responsible_indices, responsible_indices_1, responsible_indices_any_1, responsible_indices_noobj_1 = self.get_responsible_indices(converted_box_data, ground_truth_boxes)
