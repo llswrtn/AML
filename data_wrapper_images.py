@@ -159,6 +159,13 @@ class DataWrapperImages:
         #print("self.train_indices: ", self.train_indices)
         #print("self.validation_indices: ", self.validation_indices)
         print("self.test_indices: ", self.test_indices)
+
+    def rearrange_train(self, seed):
+        """
+        Rearranges the train indices.
+        """
+        np.random.seed(seed)
+        self.train_indices = np.random.permutation(self.train_indices)
         
     def get_num_train_batches(self, batch_size):
         print("get_num_train_batches: ", batch_size)
