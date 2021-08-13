@@ -461,20 +461,14 @@ class Yolo(BasicNetwork):
         converted_box_data = self.to_converted_box_data(separate_box_data)
         return converted_box_data.to(device)
 
-    def non_max_suppression(self, batch_index, input_tensor, iou_threshold=0.5, score_threshold=0.5):
+    def non_max_suppression(self, batch_index, converted_box_data, iou_threshold=0.5, score_threshold=0.5):
         """
         Applies nms to one image of the batch.
 
         :param batch_index: the index in this batch.
 
-        :param input_tensor: the input tensor with shape identical to the output of the forward method
-        (batch_size, S, S, B*5+C).
+        :param converted_box_data: tensor obtained by prepare_data with shape (num_boxes, 5+C)
         """
-        #torchvision.ops.nms requires one tensor for the boxes, and one tensor for the scores.
-        #split cells into B separate boxes
-        separate_box_data = self.to_separate_box_data(batch_index, input_tensor)
-        #convert boxes from (ccenterx, ccentery, w, h) to (x1, y1, x2, y2) 
-        converted_box_data = self.to_converted_box_data(separate_box_data)
         boxes = converted_box_data[:,[0,1,2,3]]#(x1, y1, x2, y2) with 0 <= x1 < x2 and 0 <= y1 < y2
         scores = converted_box_data[:,4]
         #pre filtering via score threshold
@@ -487,7 +481,7 @@ class Yolo(BasicNetwork):
         correct_indices = filter_indices[keep_indices]
         #get the converted box data for those indices
         filtered_converted_box_data = converted_box_data[correct_indices]
-
+        #get the grid data for those indices
         filtered_grid_data = self.stacked_grid_data[correct_indices]
         return correct_indices, filtered_converted_box_data, filtered_grid_data
 
