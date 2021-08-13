@@ -13,10 +13,24 @@ Each ground truth box has exactly one prediction that is responsible for it.
 """
 IOU_MODE_ALL = 0
 IOU_MODE_BOX_CENTER = 1
+"""
+activation_mode:
+Each ground truth box has exactly one prediction that is responsible for it.
 
-OUT_MODE_CELL_BASED_CLASS_PREDICTION = 0
-OUT_MODE_IMAGE_BASED_CLASS_PREDICTION = 1
+- ACTIVATION_MODE_LINEAR: 
+    In this mode, linear activation is used for all values of the last layer.
 
+- ACTIVATION_MODE_SIGMOID: 
+    In this mode, sigmoid is used for all values of the last layer.
+
+- ACTIVATION_MODE_CLAMP_COORDINATES: 
+    In this mode, linear activation is used for all values of the last layer.
+    Additionally coordinates of the last layer are clamped between [0,1].
+
+- ACTIVATION_MODE_SIGMOID_COORDINATES: 
+    In this mode, sigmoid is used for coordinate values of the last layer.
+    All other values of the last layer use linear activation.
+"""
 ACTIVATION_MODE_LINEAR = 0
 ACTIVATION_MODE_SIGMOID = 1
 ACTIVATION_MODE_CLAMP_COORDINATES = 2
@@ -24,31 +38,24 @@ ACTIVATION_MODE_SIGMOID_COORDINATES = 3
 
 class Yolo(BasicNetwork):
     """
-    Neural Network test
+    Base class for the yolo networks
     """
-    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, use_sigmoid=False, use_clamp_coordinates=True, iou_mode=IOU_MODE_BOX_CENTER, out_mode=OUT_MODE_IMAGE_BASED_CLASS_PREDICTION, activation_mode=ACTIVATION_MODE_LINEAR):
+    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True):
         super(Yolo, self).__init__()        
         print("init Yolo")
         self.leaky_slope = 0.1  
         self.number_of_classes = number_of_classes
         self.boxes_per_cell = boxes_per_cell
         self.dropout_p = dropout_p
-        self.use_sigmoid = use_sigmoid
-        self.use_clamp_coordinates = use_clamp_coordinates
         self.iou_mode = iou_mode
-        self.out_mode = out_mode
         self.activation_mode = activation_mode
         #alternative names for easier use
         self.B = boxes_per_cell
         self.C = number_of_classes        
         self.S = 7
         #helper variables
-        if out_mode == OUT_MODE_CELL_BASED_CLASS_PREDICTION:
-            self.values_per_cell = self.B*5+self.C
-            self.out_layer_size = self.S*self.S*(self.values_per_cell)
-        elif out_mode == OUT_MODE_IMAGE_BASED_CLASS_PREDICTION:
-            self.values_per_cell = self.B*5
-            self.out_layer_size = self.S*self.S*(self.values_per_cell) +self.C
+        self.init_helper_variables()
+        self.clamp_box_dimensions = clamp_box_dimensions     
         #setup layers
       
 
@@ -392,85 +399,9 @@ class Yolo(BasicNetwork):
         self.print_debug("layer_29_dropout", x.size())
         
         #last layer:
-        #first without activation
-        x = self.layer_30_full(x)
-        self.print_debug("layer_30_full", x.size())
-
-        #in the paper, the last layer uses linear activation instead of leaky_relu
-        if self.activation_mode == ACTIVATION_MODE_LINEAR:
-            if self.out_mode == OUT_MODE_CELL_BASED_CLASS_PREDICTION:
-                x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
-            print("return x.shape", x.shape)
-            return x
-        #alternatively we tried sigmoid
-        if self.activation_mode == ACTIVATION_MODE_SIGMOID:
-            x = F.sigmoid(x)
-            if self.out_mode == OUT_MODE_CELL_BASED_CLASS_PREDICTION:
-                x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
-            print("return x.shape", x.shape)
-            return x
-        #in the case of linear activation, we also allow clamping of the coordinates to [0,1]
-        if self.activation_mode == ACTIVATION_MODE_CLAMP_COORDINATES:
-            if self.out_mode == OUT_MODE_IMAGE_BASED_CLASS_PREDICTION:
-                y = x[:, :self.C]
-                x = x[:, self.C:]
-            x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
-            x[:,:,:,self.clamp_index_list] = T.clamp(x[:,:,:,self.clamp_index_list], 0, 1) 
-            if self.out_mode == OUT_MODE_IMAGE_BASED_CLASS_PREDICTION:
-                x = T.reshape(x, (x.shape[0], self.S*self.S*self.values_per_cell))  
-                x = T.cat((y, x), dim=1)
-            print("return x.shape", x.shape)
-            return x
-        #we also allow sigmoid only for coordinates and linear activation for all other values
-        if self.activation_mode == ACTIVATION_MODE_SIGMOID_COORDINATES:
-            if self.out_mode == OUT_MODE_IMAGE_BASED_CLASS_PREDICTION:
-                y = x[:, :self.C]
-                x = x[:, self.C:]
-            x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
-            x[:,:,:,self.clamp_index_list] = F.sigmoid(x[:,:,:,self.clamp_index_list])
-            if self.out_mode == OUT_MODE_IMAGE_BASED_CLASS_PREDICTION:
-                x = T.reshape(x, (x.shape[0], self.S*self.S*self.values_per_cell))  
-                x = T.cat((y, x), dim=1)
-            print("return x.shape", x.shape)
-            return x
-
-        print(s-5)
+        x = self.apply_last_layer(x)
+        self.print_debug("return x.shape", x.shape)
         return x
-
-    def to_separate_box_data(self, batch_index, input_tensor):
-        """
-        Prepares the output of "forward" for use with "non_max_suppression".
-
-        :param batch_index: the index in this batch.
-
-        :param input_tensor: the input tensor with shape identical to the output of the forward method (batch_size, S, S, B*5+C).
-        
-        :returns separate_box_data: tensor in the shape (num_boxes, 5+C)
-        """
-        #extract data of the specified index in the batch
-        data = input_tensor[batch_index]
-        #reshape the data so that cells are in one dimension instead of two
-        data = data.reshape((data.shape[0] * data.shape[1], data.shape[2]))
-
-        #current shape: (S*S, values_per_cell)
-        #the current shape describes B boxes per cell,
-        #but we require the boxes to be separate.
-        cells = self.S*self.S
-        separate_box_data = T.zeros((cells*self.B, 5 + self.C))
-        for i in range(self.B):
-            #calculate the class indices from the number of boxes
-            class_indices = T.arange(self.C)+(self.B*5)
-            #calculate the first 5 values depending on i (the rest is copied in the next step)
-            indices = T.arange(5 + self.C)+(i*5)
-            #copy the class indices
-            indices[-self.C:] = class_indices
-            #extract data for the current box
-            current_box_data = data[:, indices]
-            #copy extracted data into 
-            start = cells*i
-            separate_box_data[start:start+cells,:] = current_box_data
-        #print("separate_box_data", separate_box_data)
-        return separate_box_data.to(self.device)    
 
     def to_converted_box_data(self, separate_box_data):
         """
@@ -498,32 +429,35 @@ class Yolo(BasicNetwork):
         #and half width/height
         w_half = separate_box_data[:,2] / 2
         h_half = separate_box_data[:,3] / 2
+        #linear activation allows negative width and height, which is not supported.
+        if self.clamp_box_dimensions:
+            w_half = T.clamp(w_half, 0, 1)
+            h_half = T.clamp(h_half, 0, 1)
+
         converted_box_data[:,0] = center_x - w_half
         converted_box_data[:,1] = center_y - h_half
         converted_box_data[:,2] = center_x + w_half
         converted_box_data[:,3] = center_y + h_half
         return converted_box_data
 
-    def prepare_data(self, batch_index, forward_result, device):
+    def prepare_data(self, batch_element_index, forward_result, device):
         """
-        Converts the results of the forward method.
+        Converts the results of the forward method for use with the loss function and non max suppression.
 
-        :param batch_index: the index in this batch.
+        :param batch_element_index: the index in this batch.
 
         :param forward_result: the output of the forward method
         (batch_size, S, S, B*5+C).
         """
         #split cells into B separate boxes
-        separate_box_data = self.to_separate_box_data(batch_index, forward_result)
+        separate_box_data = self.to_separate_box_data(batch_element_index, forward_result)
         #convert boxes from (ccenterx, ccentery, w, h) to (x1, y1, x2, y2) 
         converted_box_data = self.to_converted_box_data(separate_box_data)
         return converted_box_data.to(device)
 
-    def non_max_suppression(self, batch_index, converted_box_data, iou_threshold=0.5, score_threshold=0.5):
+    def non_max_suppression(self, converted_box_data, iou_threshold=0.5, score_threshold=0.5):
         """
         Applies nms to one image of the batch.
-
-        :param batch_index: the index in this batch.
 
         :param converted_box_data: tensor obtained by prepare_data with shape (num_boxes, 5+C)
         """

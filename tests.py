@@ -1,5 +1,7 @@
 from data_wrapper_images import DataWrapperImages
 from yolo import Yolo
+from yolo_cell_based import YoloCellBased
+from yolo_image_based import YoloImageBased
 from plot_boxes import *
 import torch as T
 import torchvision
@@ -21,8 +23,6 @@ def test_yolo(device, yolo):
     output_tensor = yolo(input_tensor)
     print("output_tensor", output_tensor)
     print(output_tensor.shape)
-    print("output_tensor", output_tensor[0,0,0])
-    print("output_tensor", output_tensor[0,0,1])
     #yolo.save("save.pt")#--> 1GB
 
 def test_to_converted_box_data(yolo):
@@ -87,7 +87,7 @@ def test_non_max_suppression(device, yolo):
     forward_result = T.tensor(data, dtype=T.float32, device=device)
     converted_box_data = yolo.prepare_data(0, forward_result, device)
     print("converted_box_data", converted_box_data)
-    correct_indices, filtered_converted_box_data, filtered_grid_data = yolo.non_max_suppression(0, converted_box_data)
+    correct_indices, filtered_converted_box_data, filtered_grid_data = yolo.non_max_suppression(converted_box_data)
     print("correct_indices", correct_indices)
     print("filtered_converted_box_data", filtered_converted_box_data)
     print("filtered_grid_data", filtered_grid_data)
@@ -166,8 +166,14 @@ def test_loss(device, yolo):
 
     #simulate forward
     dummy_forward_result = T.tensor(data, dtype=T.float32, device=device)
+
+    #random forward
+    data = np.random.rand(2,1,448,448)
+    input_tensor = T.tensor(data, dtype=T.float32, device=device)
+    forward_result = yolo(input_tensor)
+
     #convert result of forward
-    converted_box_data = yolo.prepare_data(0, dummy_forward_result, device=device)
+    converted_box_data = yolo.prepare_data(0, forward_result, device=device)
     #call loss function for one image
     yolo.get_loss(device, converted_box_data, ground_truth, ground_truth_label)
 
@@ -197,13 +203,14 @@ def run_tests(device, data_wrapper_images):
     data_wrapper_images.test_get_image_path()
     #sys.exit(0)
     #test_iou(device)
-    yolo = Yolo(number_of_classes=4, boxes_per_cell=2).to(device)
+    #yolo = YoloCellBased(number_of_classes=4, boxes_per_cell=2).to(device)
+    yolo = YoloImageBased(number_of_classes=4, boxes_per_cell=2).to(device)
     yolo.initialize(device)
     #test_get_intersected_cells(device, yolo)
     #test_get_responsible_cells(device, yolo)
     #test_get_responsible_indices(device, yolo)
-    #test_loss(device, yolo)
-    test_yolo(device, yolo)
+    test_loss(device, yolo)
+    #test_yolo(device, yolo)
     #test_non_max_suppression(device, yolo)
     #test_to_converted_box_data(yolo)
     print("tests completed")
