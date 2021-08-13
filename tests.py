@@ -148,7 +148,7 @@ def test_get_responsible_cells(device, yolo):
         [0.6, 0.6, 0.8, 0.8]])
     ground_truth_boxes = T.tensor(ground_truth_boxes, dtype=T.float32, device=device)
 
-    responsible_cells_mask, responsible_cells_1 = yolo.get_responsible_cells(ground_truth_boxes)
+    responsible_cells_mask, responsible_cells_1, responsible_cells_index_list = yolo.get_responsible_cells(ground_truth_boxes)
     #plot
     plot_intersected_cells_and_ground_truth(responsible_cells_mask, yolo.grid_data, ground_truth_boxes)
 

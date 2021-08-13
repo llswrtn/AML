@@ -1,22 +1,24 @@
 from basic_network import *
 
 """
-IOU_MODE_ALL: each ground truth box has exactly one prediction that is responsible for it.
-In this mode, the responsible box is the box with highest IOU of all S*S*B boxes.
+iou_mode:
+Each ground truth box has exactly one prediction that is responsible for it.
+
+- IOU_MODE_ALL: 
+    In this mode, the responsible box is the box with highest IOU of all S*S*B boxes.
+
+- IOU_MODE_BOX_CENTER: 
+    In this mode, the responsible box is the box with highest IOU of all B boxes that are in the grid cell
+    where the center of the ground truth box falls into.
 """
 IOU_MODE_ALL = 0
-"""
-IOU_MODE_BOX_CENTER: each ground truth box has exactly one prediction that is responsible for it.
-In this mode, the responsible box is the box with highest IOU of all B boxes that are in the grid cell
-where the center of the ground truth box falls into.
-"""
 IOU_MODE_BOX_CENTER = 1
 
 class Yolo(BasicNetwork):
     """
     Neural Network test
     """
-    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, use_sigmoid=False, use_clamp_coordinates=True, iou_mode=IOU_MODE_ALL):
+    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, use_sigmoid=False, use_clamp_coordinates=True, iou_mode=IOU_MODE_BOX_CENTER):
         super(Yolo, self).__init__()        
         print("init Yolo")
         self.leaky_slope = 0.1  
@@ -500,7 +502,8 @@ class Yolo(BasicNetwork):
 
     def get_responsible_indices(self, converted_box_data, ground_truth_boxes):
         """
-        Identify which boxes are responsible.
+        Identify which boxes are responsible. Uses self.iou_mode to decide responsibility.
+        See top of this file for explanations of the different modes.
 
         :param batch_index: the index in this batch.
 
@@ -522,12 +525,40 @@ class Yolo(BasicNetwork):
         the paper mentions that they 'decrease the loss from confidence predictions for boxes that don't contain objects',
         so we interpret this as the inverted responsible_indices_any_1, but we are unsure if this is correct
         """
-        responsible_indices = None
+        responsible_indices = T.empty((ground_truth_boxes.shape[0]), dtype=T.long)
         if self.iou_mode == IOU_MODE_ALL:
             iou = torchvision.ops.box_iou(converted_box_data[:,0:4], ground_truth_boxes)
             responsible_indices = T.argmax(iou, dim=0)
         elif self.iou_mode == IOU_MODE_BOX_CENTER:
-            pass
+            #get the cells responsible for each ground truth box
+            responsible_cells_mask, responsible_cells_1, responsible_cells_indices = self.get_responsible_cells(ground_truth_boxes)
+            print("responsible_cells_mask", responsible_cells_mask)
+            print("responsible_cells_mask.shape", responsible_cells_mask.shape)
+            #extend the responsible cell indices to all B boxes
+            num_box_indices = T.arange(self.B, device=self.device)
+            num_box_indices = T.reshape(num_box_indices, (*num_box_indices.shape, 1))
+            cell_indices_extended = num_box_indices * self.S*self.S + responsible_cells_indices
+            print("cell_indices_extended", cell_indices_extended)
+            #apply iou for each ground truth box
+            for i in range(ground_truth_boxes.shape[0]):
+                #get and reshape the ground truth box
+                ground_truth_box = ground_truth_boxes[i]
+                ground_truth_box = T.reshape(ground_truth_box, (1, *ground_truth_box.shape))
+                print("ground_truth_box", ground_truth_box)
+                #get the indices of all B boxes that are associated with the responsible cell of the current ground truth box
+                cell_indices_extended_i = cell_indices_extended[:,i]
+                #get only those B boxes
+                filtered_boxes = converted_box_data[cell_indices_extended_i,0:4]
+                #apply iou to those B boxes and the current ground_truth_box
+                iou = torchvision.ops.box_iou(filtered_boxes, ground_truth_box)
+                print("iou", iou)
+                #get the filtered index 
+                responsible_index_j = T.argmax(iou, dim=0)
+                print("responsible_index_j", responsible_index_j)
+                #get the correct index 
+                responsible_index = cell_indices_extended_i[responsible_index_j]
+                print("responsible_index", responsible_index)
+                responsible_indices[i] = responsible_index            
         else:
             print("unknown iou mode")
             sys.exit(1)
@@ -538,6 +569,8 @@ class Yolo(BasicNetwork):
         
         responsible_indices_1 = T.zeros((converted_box_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.float32, device=self.device)                
         responsible_indices_1[responsible_indices, indices] = 1
+
+        print("responsible_indices_1", responsible_indices_1)
 
         responsible_indices_any_1 = T.max(responsible_indices_1, dim=1).values
         responsible_indices_any_1 = T.reshape(responsible_indices_any_1, (self.S*self.S*self.B, 1))
@@ -602,6 +635,7 @@ class Yolo(BasicNetwork):
         cell_size = 1 / self.S
         #ground_truth_boxes: (x1, y1, x2, y2)
         #grid_data: (grid x index, grid y index, cell min x, cell max x, cell min y, cell max y)
+        responsible_cells_indices = T.zeros(ground_truth_boxes.shape[0], dtype=T.long, device=self.device)
         for i in range(ground_truth_boxes.shape[0]):
             x = (ground_truth_boxes[i,0] + ground_truth_boxes[i,2]) / 2
             y = (ground_truth_boxes[i,1] + ground_truth_boxes[i,3]) / 2
@@ -609,10 +643,11 @@ class Yolo(BasicNetwork):
             y_index = int(y / cell_size)
             cell_index = x_index + y_index * self.S
             responsible_cells_mask[cell_index, i] = True
+            responsible_cells_indices[i] = cell_index
 
         responsible_cells_1 = T.zeros_like(responsible_cells_mask, dtype=T.float32, device=self.device)
         responsible_cells_1[responsible_cells_mask] = 1
-        return responsible_cells_mask, responsible_cells_1
+        return responsible_cells_mask, responsible_cells_1, responsible_cells_indices
 
     def get_class_probability_map(self, converted_box_data):
         """
