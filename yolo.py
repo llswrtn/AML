@@ -440,7 +440,7 @@ class Yolo(BasicNetwork):
         converted_box_data[:,3] = center_y + h_half
         return converted_box_data
 
-    def prepare_data(self, batch_element_index, forward_result, device):
+    def prepare_data(self, batch_element_index, forward_result):
         """
         Converts the results of the forward method for use with the loss function and non max suppression.
 
@@ -453,7 +453,7 @@ class Yolo(BasicNetwork):
         separate_box_data = self.to_separate_box_data(batch_element_index, forward_result)
         #convert boxes from (ccenterx, ccentery, w, h) to (x1, y1, x2, y2) 
         converted_box_data = self.to_converted_box_data(separate_box_data)
-        return converted_box_data.to(device)
+        return converted_box_data.to(self.device)
 
     def non_max_suppression(self, converted_box_data, iou_threshold=0.5, score_threshold=0.5):
         """
@@ -640,7 +640,26 @@ class Yolo(BasicNetwork):
         class_probability_map = converted_box_data[:self.S*self.S, 5:]
         return class_probability_map
 
-    def get_loss(self, device, converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord = 5, lambda_noobj = 0.5):
+    def get_batch_loss(self, forward_result, batch_boxes, batch_labels, lambda_coord = 5, lambda_noobj = 0.5):
+        """
+        Calculates loss for an entire batch.
+
+        :param forward_result: the tensor obtained from forward.
+ 
+        """
+        print("get_batch_loss")
+        print(forward_result.shape)
+        batch_size = forward_result.shape[0]
+        total_loss = 0
+        for i in range(batch_size):
+            converted_box_data = self.prepare_data(i, forward_result)
+            ground_truth_boxes = batch_boxes[i]
+            ground_truth_label = batch_labels[i]
+            loss_i = self.get_loss(converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord=lambda_coord, lambda_noobj=lambda_noobj)
+            total_loss += loss_i
+        print("total_loss", total_loss)
+        
+    def get_loss(self, converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord = 5, lambda_noobj = 0.5):
         """
         Calculates loss for a single image.
 
@@ -651,7 +670,11 @@ class Yolo(BasicNetwork):
         :param ground_truth_label: the one hot encoded ground truth label.
         In this task there is only one label for all boxes of an image     
         """
-        print("get_loss")
+        #if there are no boxes,
+        if ground_truth_boxes is None:
+            class_probability_map = self.get_class_probability_map(converted_box_data)
+            return 0
+
         #extract data
         responsible_indices, responsible_indices_1, responsible_indices_any_1, responsible_indices_noobj_1 = self.get_responsible_indices(converted_box_data, ground_truth_boxes)
         intersected_cells_mask, intersected_cells_1, intersected_cells_1_any_box = self.get_intersected_cells(ground_truth_boxes)

@@ -85,7 +85,7 @@ def test_non_max_suppression(device, yolo):
     data[0,5,3,9] = 0.74#score
 
     forward_result = T.tensor(data, dtype=T.float32, device=device)
-    converted_box_data = yolo.prepare_data(0, forward_result, device)
+    converted_box_data = yolo.prepare_data(0, forward_result)
     print("converted_box_data", converted_box_data)
     correct_indices, filtered_converted_box_data, filtered_grid_data = yolo.non_max_suppression(converted_box_data)
     print("correct_indices", correct_indices)
@@ -126,7 +126,7 @@ def test_get_responsible_indices(device, yolo):
     #simulate forward
     dummy_forward_result = T.tensor(data, dtype=T.float32, device=device)
     #convert result of forward
-    converted_box_data = yolo.prepare_data(0, dummy_forward_result, device=device)
+    converted_box_data = yolo.prepare_data(0, dummy_forward_result)
     #get responsible indices
     responsible_indices, responsible_indices_1, responsible_indices_any_1, responsible_indices_noobj_1 = yolo.get_responsible_indices(converted_box_data, ground_truth_boxes)
     #plot
@@ -152,8 +152,9 @@ def test_get_responsible_cells(device, yolo):
     #plot
     plot_intersected_cells_and_ground_truth(responsible_cells_mask, yolo.grid_data, ground_truth_boxes)
 
-def test_loss(device, yolo):
+def test_loss(device, yolo, data_wrapper_images):
     np.random.seed(1)
+    """
     data = np.random.rand(64,yolo.S,yolo.S,yolo.values_per_cell)
 
     ground_truth = np.array([
@@ -173,18 +174,36 @@ def test_loss(device, yolo):
     forward_result = yolo(input_tensor)
 
     #convert result of forward
-    converted_box_data = yolo.prepare_data(0, forward_result, device=device)
+    converted_box_data = yolo.prepare_data(0, forward_result)
     #call loss function for one image
-    yolo.get_loss(device, converted_box_data, ground_truth, ground_truth_label)
+    yolo.get_loss(converted_box_data, ground_truth, ground_truth_label)
+    """
+    
+    data = np.random.rand(2,1,448,448)
+    input_tensor = T.tensor(data, dtype=T.float32, device=device)
+    forward_result = yolo(input_tensor)
+    print("forward_result", forward_result)
 
-def test_data(data_wrapper_images):    
+    data_wrapper_images.split_train_validation_test(p_train=0.8, p_validation=0.1, seed=1)
+    batch_size = 2
+    num_test_batches = data_wrapper_images.get_num_test_batches(batch_size) 
+    print("num_test_batches", num_test_batches)
+    batch_images, batch_boxes, batch_labels = data_wrapper_images.get_test_batch(0, batch_size, device=device) 
+    print("batch_images.shape", batch_images.shape)
+    print("len(batch_boxes)", len(batch_boxes))
+    print("batch_labels.shape", batch_labels.shape)
+    forward_result = yolo(batch_images)
+    #call loss function for batch
+    yolo.get_batch_loss(forward_result, batch_boxes, batch_labels)
+
+def test_data(data_wrapper_images, device):    
     print("test_data")
     data_wrapper_images.split_train_validation_test(p_train=0.8, p_validation=0.1, seed=1)
 
     batch_size = 8
     num_test_batches = data_wrapper_images.get_num_test_batches(batch_size) 
     print("num_test_batches", num_test_batches)
-    batch_images, batch_boxes, batch_labels = data_wrapper_images.get_test_batch(0, batch_size) 
+    batch_images, batch_boxes, batch_labels = data_wrapper_images.get_test_batch(0, batch_size, device) 
     print("batch_images", batch_images)
     print("batch_boxes", batch_boxes)
     print("batch_labels", batch_labels)
@@ -199,7 +218,7 @@ def test_data(data_wrapper_images):
 
 def run_tests(device, data_wrapper_images):
     print("running tests...")
-    test_data(data_wrapper_images)
+    test_data(data_wrapper_images, device)
     data_wrapper_images.test_get_image_path()
     #sys.exit(0)
     #test_iou(device)
@@ -209,7 +228,7 @@ def run_tests(device, data_wrapper_images):
     #test_get_intersected_cells(device, yolo)
     #test_get_responsible_cells(device, yolo)
     #test_get_responsible_indices(device, yolo)
-    test_loss(device, yolo)
+    test_loss(device, yolo, data_wrapper_images)
     #test_yolo(device, yolo)
     #test_non_max_suppression(device, yolo)
     #test_to_converted_box_data(yolo)

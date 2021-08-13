@@ -185,7 +185,7 @@ class DataWrapperImages:
         print("num_batches: ", num_batches)
         return num_batches
 
-    def get_train_batch(self, batch_index, batch_size):
+    def get_train_batch(self, batch_index, batch_size, device):
         """
         Get the training data of the batch with the specified index.
         To get the number of batches, call get_num_train_batches
@@ -200,9 +200,9 @@ class DataWrapperImages:
         
         returns batch_labels: a tensor with shape (batch_size, C)
         """
-        return self.get_batch(batch_index, batch_size, self.train_indices)
+        return self.get_batch(batch_index, batch_size, self.train_indices, device)
 
-    def get_validation_batch(self, batch_index, batch_size):
+    def get_validation_batch(self, batch_index, batch_size, device):
         """
         Get the validation data of the batch with the specified index.
         To get the number of batches, call get_num_validation_batches
@@ -217,9 +217,9 @@ class DataWrapperImages:
         
         returns batch_labels: a tensor with shape (batch_size, C)
         """
-        return self.get_batch(batch_index, batch_size, self.validation_indices)
+        return self.get_batch(batch_index, batch_size, self.validation_indices, device)
 
-    def get_test_batch(self, batch_index, batch_size):
+    def get_test_batch(self, batch_index, batch_size, device):
         """
         Get the test data of the batch with the specified index.
         To get the number of batches, call get_num_test_batches
@@ -234,9 +234,9 @@ class DataWrapperImages:
         
         returns batch_labels: a tensor with shape (batch_size, C)
         """
-        return self.get_batch(batch_index, batch_size, self.test_indices)
+        return self.get_batch(batch_index, batch_size, self.test_indices, device)
 
-    def get_batch(self, batch_index, batch_size, target):
+    def get_batch(self, batch_index, batch_size, target, device):
         """
         Internal method used by get_train_batch, get_validation_batch, and get_test_batch
         """       
@@ -244,12 +244,13 @@ class DataWrapperImages:
         start = batch_index*batch_size
         indices = target[start:start+batch_size]
         print("indices: ", indices)
-        batch_images = self.get_images(indices)
-        batch_boxes = self.get_boxes(indices)
-        batch_labels = self.get_labels(indices)
+        batch_images = self.get_images(indices, device)
+        batch_images = T.reshape(batch_images, (batch_size, 1, 448, 448))
+        batch_boxes = self.get_boxes(indices, device)
+        batch_labels = self.get_labels(indices, device)
         return batch_images, batch_boxes, batch_labels
 
-    def get_images(self, indices):
+    def get_images(self, indices, device):
         """
         Returns a tensor containing the images associated with the indices.
         - If keep_images_in_ram is true, the images are obtained from self.images_448
@@ -265,9 +266,9 @@ class DataWrapperImages:
             for i in range(batch_size):
                 path = self.path_448_list[i]
                 batch_images[i] = np.load(path)
-        return T.tensor(batch_images, dtype=T.float32)
+        return T.tensor(batch_images, dtype=T.float32, device=device)
 
-    def get_boxes(self, indices):
+    def get_boxes(self, indices, device):
         """
         Returns a list of tensors containing the boxes associated with the indices.
         """  
@@ -277,15 +278,15 @@ class DataWrapperImages:
             index = indices[i]
             boxes = self.ground_truth_boxes_list[index]
             if not boxes is None:
-                batch_boxes[i] = T.tensor(boxes, dtype=T.float32)
+                batch_boxes[i] = T.tensor(boxes, dtype=T.float32, device=device)
         return batch_boxes
 
-    def get_labels(self, indices):
+    def get_labels(self, indices, device):
         """
         Returns a tensor of one hot encoded labels associated with the indices.
         """        
         batch_labels = self.labels[indices]
-        return T.tensor(batch_labels, dtype=T.float32)
+        return T.tensor(batch_labels, dtype=T.float32, device=device)
 
     def get_image_path(self, row_index, original=True):
         image_id = self.data_frame.loc[row_index,"id"].replace("_image", ".dcm")
