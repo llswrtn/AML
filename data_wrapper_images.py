@@ -167,6 +167,9 @@ class DataWrapperImages:
                 self.annotated_list.append(image_index)
             else:
                 self.unannotated_list.append(image_index)
+
+                
+        self.num_annotated_images = len(self.annotated_list)
         
         num_labels_all = np.zeros(4)
         num_no_boxes_labels_all = np.zeros(4)
@@ -250,21 +253,31 @@ class DataWrapperImages:
             print("save label list...")
             np.save(path_labels, self.labels)
 
-    def split_train_validation_test(self, p_train=0.8, p_validation=0.1, seed=1):
+    def split_train_validation_test(self, p_train=0.8, p_validation=0.1, seed=1, only_use_annotated=True):
+        #select all_indices depending on whether all images or only annotated are loaded
+        all_indices = np.arange(self.num_total_images)
+        num_all = self.num_total_images
+        if only_use_annotated:
+            all_indices = self.annotated_list
+            num_all = self.num_annotated_images
+
         #get number of indices for each set
         p_test = 1-p_train-p_validation
-        num_train = int(p_train * self.num_total_images)
-        num_validation = int(p_validation * self.num_total_images)
-        num_test = self.num_total_images - num_train - num_validation
+        num_train = int(p_train * num_all)
+        num_validation = int(p_validation * num_all)
+        num_test = num_all - num_train - num_validation
 
         #generate a random permutation of all indices
         np.random.seed(seed)
-        all_indices = np.arange(self.num_total_images)
         all_indices = np.random.permutation(all_indices)
 
         self.train_indices = all_indices[0:num_train]
         self.validation_indices = all_indices[num_train:num_train+num_validation]
         self.test_indices = all_indices[num_train+num_validation:]
+        print("num_all", num_all)
+        print("train_indices", len(self.train_indices))
+        print("validation_indices", len(self.validation_indices))
+        print("test_indices", len(self.test_indices))
         
     def rearrange_train(self, seed):
         """
