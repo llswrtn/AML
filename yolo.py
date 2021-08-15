@@ -366,11 +366,11 @@ class Yolo(BasicNetwork):
         """
         Applies the default yolo layers except the last layer
         """
-        x = F.leaky_relu(self.layer_0_conv(x), negative_slope=self.leaky_slope)
+        x = self.layer_0_conv(x)#no activation because next layer is maxpool, followed by activation
         self.print_debug("layer_0_conv", x.size())
         x = F.leaky_relu(self.layer_1_maxpool(x), negative_slope=self.leaky_slope)
         self.print_debug("layer_1_maxpool", x.size())
-        x = F.leaky_relu(self.layer_2_conv(x), negative_slope=self.leaky_slope)
+        x = self.layer_2_conv(x)#no activation because next layer is maxpool, followed by activation
         self.print_debug("layer_2_conv", x.size())
         x = F.leaky_relu(self.layer_3_maxpool(x), negative_slope=self.leaky_slope)
         self.print_debug("layer_3_maxpool", x.size())
@@ -380,7 +380,7 @@ class Yolo(BasicNetwork):
         self.print_debug("layer_5_conv", x.size())
         x = F.leaky_relu(self.layer_6_conv(x), negative_slope=self.leaky_slope)
         self.print_debug("layer_6_conv", x.size())
-        x = F.leaky_relu(self.layer_7_conv(x), negative_slope=self.leaky_slope)
+        x = self.layer_7_conv(x)#no activation because next layer is maxpool, followed by activation
         self.print_debug("layer_7_conv", x.size())
         x = F.leaky_relu(self.layer_8_maxpool(x), negative_slope=self.leaky_slope)
         self.print_debug("layer_8_maxpool", x.size())
@@ -402,7 +402,7 @@ class Yolo(BasicNetwork):
         self.print_debug("layer_16_conv", x.size())
         x = F.leaky_relu(self.layer_17_conv(x), negative_slope=self.leaky_slope)
         self.print_debug("layer_17_conv", x.size())
-        x = F.leaky_relu(self.layer_18_conv(x), negative_slope=self.leaky_slope)
+        x = self.layer_18_conv(x)#no activation because next layer is maxpool, followed by activation
         self.print_debug("layer_18_conv", x.size())
         x = F.leaky_relu(self.layer_19_maxpool(x), negative_slope=self.leaky_slope)
         self.print_debug("layer_19_maxpool", x.size())
