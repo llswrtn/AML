@@ -724,32 +724,25 @@ class Yolo(BasicNetwork):
         elif self.iou_mode == IOU_MODE_BOX_CENTER:
             #get the cells responsible for each ground truth box
             responsible_cells_mask, responsible_cells_1, responsible_cells_indices = self.get_responsible_cells(ground_truth_boxes)
-            print("responsible_cells_mask", responsible_cells_mask)
-            print("responsible_cells_mask.shape", responsible_cells_mask.shape)
             #extend the responsible cell indices to all B boxes
             num_box_indices = T.arange(self.B, device=self.device)
             num_box_indices = T.reshape(num_box_indices, (*num_box_indices.shape, 1))
             cell_indices_extended = num_box_indices * self.S*self.S + responsible_cells_indices
-            print("cell_indices_extended", cell_indices_extended)
             #apply iou for each ground truth box
             for i in range(ground_truth_boxes.shape[0]):
                 #get and reshape the ground truth box
                 ground_truth_box = ground_truth_boxes[i]
                 ground_truth_box = T.reshape(ground_truth_box, (1, *ground_truth_box.shape))
-                print("ground_truth_box", ground_truth_box)
                 #get the indices of all B boxes that are associated with the responsible cell of the current ground truth box
                 cell_indices_extended_i = cell_indices_extended[:,i]
                 #get only those B boxes
                 filtered_boxes = converted_box_data[cell_indices_extended_i,0:4]
                 #apply iou to those B boxes and the current ground_truth_box
                 iou = torchvision.ops.box_iou(filtered_boxes, ground_truth_box)
-                print("iou", iou)
                 #get the filtered index 
                 responsible_index_j = T.argmax(iou, dim=0)
-                print("responsible_index_j", responsible_index_j)
                 #get the correct index 
                 responsible_index = cell_indices_extended_i[responsible_index_j]
-                print("responsible_index", responsible_index)
                 responsible_indices[i] = responsible_index            
         else:
             print("unknown iou mode")
@@ -762,19 +755,12 @@ class Yolo(BasicNetwork):
         responsible_indices_1 = T.zeros((converted_box_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.float32, device=self.device)                
         responsible_indices_1[responsible_indices, indices] = 1
 
-        print("responsible_indices_1", responsible_indices_1)
-
         responsible_indices_any_1 = T.max(responsible_indices_1, dim=1).values
         responsible_indices_any_1 = T.reshape(responsible_indices_any_1, (self.S*self.S*self.B, 1))
-        #print("responsible_indices_any_1", responsible_indices_any_1)
 
         responsible_indices_noobj_1 = T.ones_like(responsible_indices_any_1)
         responsible_indices_noobj_1[responsible_indices_any_1 > 0] = 0
-        #print("responsible_indices_noobj_1", responsible_indices_noobj_1)
         
-        #responsible_indices_noobj_1 = T.ones((converted_box_data.shape[0], ground_truth_boxes.shape[0]), dtype=T.float32, device=self.device)                
-        #responsible_indices_noobj_1[responsible_indices, indices] = 0
-
         return responsible_indices, responsible_indices_1, responsible_indices_any_1, responsible_indices_noobj_1
 
     def get_intersected_cells(self, ground_truth_boxes):
@@ -861,8 +847,6 @@ class Yolo(BasicNetwork):
 
         :param forward_result: the tensor obtained from forward. 
         """
-        print("get_batch_loss")
-        print(forward_result.shape)
         batch_size = forward_result.shape[0]
         total_loss = 0
         for i in range(batch_size):
@@ -871,7 +855,6 @@ class Yolo(BasicNetwork):
             ground_truth_label = batch_labels[i]
             loss_i = self.get_loss(converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord=lambda_coord, lambda_noobj=lambda_noobj)
             total_loss += loss_i
-        print("total_loss", total_loss)
         return total_loss
 
     def get_batch_class_predictions(self, forward_result, iou_threshold=0.5, score_threshold=0.5):
@@ -880,16 +863,12 @@ class Yolo(BasicNetwork):
 
         :param forward_result: the tensor obtained from forward. 
         """
-        print("get_batch_class_predictions")
-        print(forward_result.shape)
         batch_size = forward_result.shape[0]
         predictions = T.empty((batch_size, self.C))
         for i in range(batch_size):
-            print("batch element i", i)
             converted_box_data = self.prepare_data(i, forward_result)
             _, filtered_converted_box_data, _ = self.non_max_suppression(converted_box_data, iou_threshold=iou_threshold, score_threshold=score_threshold)    
             predictions_i = self.get_class_prediction(filtered_converted_box_data)
-            print("predictions_i", predictions_i)
             predictions[i] = predictions_i
         return predictions
 
@@ -900,14 +879,11 @@ class Yolo(BasicNetwork):
 
         :param forward_result: the tensor obtained from forward. 
         """
-        print("get_batch_loss_and_class_predictions_and_boxes")
-        print(forward_result.shape)
         batch_size = forward_result.shape[0]
         predictions = T.empty((batch_size, self.C))
         total_loss = 0
         list_filtered_converted_box_data = [None] * batch_size
         for i in range(batch_size):
-            print("batch element i", i)
             converted_box_data = self.prepare_data(i, forward_result)
             _, filtered_converted_box_data, _ = self.non_max_suppression(converted_box_data, iou_threshold=iou_threshold, score_threshold=score_threshold)    
             #loss
@@ -917,7 +893,6 @@ class Yolo(BasicNetwork):
             total_loss += loss_i
             #predictions
             predictions_i = self.get_class_prediction(filtered_converted_box_data)
-            print("predictions_i", predictions_i)
             predictions[i] = predictions_i
             #list of box tensors
             list_filtered_converted_box_data[i] = None   
@@ -945,15 +920,10 @@ class Yolo(BasicNetwork):
             box_noobj_confidence_errors = (
                 T.square(0 - converted_box_data_c)
             )
-            print("box_noobj_confidence_errors", box_noobj_confidence_errors)
             part_4 = lambda_noobj * T.sum(box_noobj_confidence_errors)
-            print("part_4", part_4)
 
             #PART 5: classification error
             classification_errors = T.square(ground_truth_label - class_probability_map) 
-            print("ground_truth_label", ground_truth_label)  
-            print("class_probability_map", class_probability_map)  
-            print("classification_errors", classification_errors)  
             part_5 = T.sum(classification_errors)
 
             return part_4 + part_5
@@ -962,8 +932,6 @@ class Yolo(BasicNetwork):
         responsible_indices, responsible_indices_1, responsible_indices_any_1, responsible_indices_noobj_1 = self.get_responsible_indices(converted_box_data, ground_truth_boxes)
         intersected_cells_mask, intersected_cells_1, intersected_cells_1_any_box = self.get_intersected_cells(ground_truth_boxes)
         class_probability_map = self.get_class_probability_map(converted_box_data)
-        print("ground_truth_boxes", ground_truth_boxes)
-        print("converted_box_data[responsible_indices]", converted_box_data[responsible_indices])
         #ground_truth_boxes: (x1, y1, x2, y2)
         ground_truth_boxes_x1 = ground_truth_boxes[:,0]
         ground_truth_boxes_y1 = ground_truth_boxes[:,1]
@@ -996,7 +964,6 @@ class Yolo(BasicNetwork):
             T.square(ground_truth_boxes_x1 - converted_box_data_x1) + 
             T.square(ground_truth_boxes_y1 - converted_box_data_y1)
         )
-        print("box_position_errors", box_position_errors)
         part_1 = lambda_coord * lambda_scale * T.sum(box_position_errors)   
 
         
@@ -1011,7 +978,6 @@ class Yolo(BasicNetwork):
                 T.sqrt(converted_box_data_y2-converted_box_data_y1)
             )
         )
-        print("box_dimension_errors", box_dimension_errors)
         part_2 = lambda_coord * T.sum(box_dimension_errors)   
 
 
@@ -1021,7 +987,6 @@ class Yolo(BasicNetwork):
         box_confidence_errors = responsible_indices_any_1 * (
             T.square(1 - converted_box_data_c)
         )
-        print("box_confidence_errors", box_confidence_errors)
         part_3 = T.sum(box_confidence_errors)   
 
         
@@ -1029,27 +994,15 @@ class Yolo(BasicNetwork):
         box_noobj_confidence_errors = responsible_indices_noobj_1 * (
             T.square(0 - converted_box_data_c)
         )
-        print("box_noobj_confidence_errors", box_noobj_confidence_errors)
         part_4 = lambda_noobj * T.sum(box_noobj_confidence_errors)
 
 
         #PART 5: classification error
-        classification_errors = intersected_cells_1_any_box * T.square(ground_truth_label - class_probability_map) 
-        print("classification_errors", classification_errors)  
+        classification_errors = intersected_cells_1_any_box * T.square(ground_truth_label - class_probability_map)
         part_5 = T.sum(classification_errors)   
-
-        print("part_1", part_1)  
-        print("part_2", part_2)  
-        print("part_3", part_3)  
-        print("part_4", part_4)  
-        print("part_5", part_5)  
-        print("responsible_indices_1.shape", responsible_indices_1.shape)  
-        print("responsible_indices_any_1.shape", responsible_indices_any_1.shape)  
-        print("responsible_indices_noobj_1.shape", responsible_indices_noobj_1.shape) 
 
         #combine parts 
         total_loss = part_1 + part_2 + part_3 + part_4 + part_5
-        print("total_loss", total_loss)  
         return total_loss
 
     def get_class_prediction(self, filtered_converted_box_data):
@@ -1062,7 +1015,6 @@ class Yolo(BasicNetwork):
         
         #special case for no boxes predicted --> no pneumonia
         if filtered_converted_box_data.shape[0] == 0:
-            print("no boxes remain")
             no_pneumonia = T.zeros((1, self.C))
             no_pneumonia[0,0] = 1
             return no_pneumonia
@@ -1072,33 +1024,21 @@ class Yolo(BasicNetwork):
         confidences = T.reshape(confidences, (*confidences.shape, 1))
         probabilities = filtered_converted_box_data[:, 5:]
         class_specific_confidence = confidences * probabilities
-        print("confidences", confidences)
-        print("probabilities", probabilities)
-        print("class_specific_confidence", class_specific_confidence)
 
         #there are multiple ways to obtain a single class prediction
         #method 1: use the highest class specific confidence found
         if self.prediction_method == PREDICTION_MAX:
             max_cscs = T.max(class_specific_confidence, dim=0).values
             index = T.argmax(max_cscs)
-            #row_indices = T.argmax(class_specific_confidence, dim=0)
-            #max_cscs = class_specific_confidence[row_indices]
-            #print("row_indices", row_indices)
-            print("max_cscs", max_cscs)
-            print("index", index)
             prediction = T.zeros((1, self.C))
             prediction[0,index] = 1
-            print("prediction", prediction)
             return prediction
         #method 2: use the highest mean class specific confidence found
         if self.prediction_method == PREDICTION_MAX_MEAN:
             mean_cscs = T.mean(class_specific_confidence, dim=0)
             index = T.argmax(mean_cscs)
-            print("mean_cscs", mean_cscs)
-            print("index", index)
             prediction = T.zeros((1, self.C))
             prediction[0,index] = 1
-            print("prediction", prediction)
             return prediction
 
         print("unknown prediction method", self.prediction_method.shape)

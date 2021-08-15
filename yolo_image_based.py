@@ -62,14 +62,10 @@ class YoloImageBased(Yolo):
         cells = self.S*self.S
         #extract data of the specified index in the batch
         data = input_tensor[batch_element_index]
-        print("data.shape", data.shape)
         y = data[:self.C]
-        print("y.shape", y.shape)
         x = data[self.C:]
-        print("x.shape", x.shape)
         #reshape the data so that cells are in one dimension instead of two
         x = T.reshape(x, (cells, self.values_per_cell))
-        print("x 1", x)
 
         #current shape: (S*S, values_per_cell)
         #the current shape describes B boxes per cell,
@@ -82,11 +78,4 @@ class YoloImageBased(Yolo):
             separate_box_data[start:start+cells,:5] = x[:, indices]
             #classes are the same for each box
             separate_box_data[start:start+cells,5:] = y
-            print("indices", indices)
-            print("x[:, indices]", x[:, indices])
-            print("x[:, indices].shape", x[:, indices].shape)
-            print("y", y)
-            print("separate_box_data[start:start+cells,:5].shape", separate_box_data[start:start+cells,:5].shape)
-            print("separate_box_data[start:start+cells,5:].shape", separate_box_data[start:start+cells,5:].shape)
-        print("separate_box_data", separate_box_data)
         return separate_box_data.to(self.device)  

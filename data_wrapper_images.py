@@ -139,12 +139,6 @@ class DataWrapperImages:
         num_train = int(p_train * self.num_total_images)
         num_validation = int(p_validation * self.num_total_images)
         num_test = self.num_total_images - num_train - num_validation
-        #print("p_train: ", p_train)
-        #print("p_validation: ", p_validation)
-        #print("p_test: ", p_test)
-        #print("num_train: ", num_train)
-        #print("num_validation: ", num_validation)
-        #print("num_test: ", num_test)
 
         #generate a random permutation of all indices
         np.random.seed(seed)
@@ -155,11 +149,6 @@ class DataWrapperImages:
         self.validation_indices = all_indices[num_train:num_train+num_validation]
         self.test_indices = all_indices[num_train+num_validation:]
         
-        #print("all_indices: ", all_indices)
-        #print("self.train_indices: ", self.train_indices)
-        #print("self.validation_indices: ", self.validation_indices)
-        print("self.test_indices: ", self.test_indices)
-
     def rearrange_train(self, seed):
         """
         Rearranges the train indices.
@@ -168,21 +157,15 @@ class DataWrapperImages:
         self.train_indices = np.random.permutation(self.train_indices)
         
     def get_num_train_batches(self, batch_size):
-        print("get_num_train_batches: ", batch_size)
         num_batches = int(len(self.train_indices) / batch_size)
-        print("num_batches: ", num_batches)
         return num_batches
 
     def get_num_validation_batches(self, batch_size):
-        print("get_num_validation_batches: ", batch_size)
         num_batches = int(len(self.validation_indices) / batch_size)
-        print("num_batches: ", num_batches)
         return num_batches
 
     def get_num_test_batches(self, batch_size):
-        print("get_num_test_batches: ", batch_size)
         num_batches = int(len(self.test_indices) / batch_size)
-        print("num_batches: ", num_batches)
         return num_batches
 
     def get_train_batch(self, batch_index, batch_size, device):
@@ -240,10 +223,8 @@ class DataWrapperImages:
         """
         Internal method used by get_train_batch, get_validation_batch, and get_test_batch
         """       
-        print("get_batch: ", batch_index, batch_size)
         start = batch_index*batch_size
         indices = target[start:start+batch_size]
-        print("indices: ", indices)
         batch_images = self.get_images(indices, device)
         batch_images = T.reshape(batch_images, (batch_size, 1, 448, 448))
         batch_boxes = self.get_boxes(indices, device)
@@ -256,7 +237,6 @@ class DataWrapperImages:
         - If keep_images_in_ram is true, the images are obtained from self.images_448
         - otherwise each image is loaded from the associated file.
         """        
-        #print("get_images: ", indices)
         batch_images = None
         if self.keep_images_in_ram:
             batch_images = self.images_448[indices]

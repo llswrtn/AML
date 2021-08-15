@@ -72,5 +72,4 @@ class YoloCellBased(Yolo):
             #copy extracted data into 
             start = cells*i
             separate_box_data[start:start+cells,:] = current_box_data
-        #print("separate_box_data", separate_box_data)
         return separate_box_data.to(self.device)  
