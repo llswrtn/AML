@@ -974,8 +974,6 @@ class Yolo(BasicNetwork):
                     classification_errors = T.square(ground_truth_label - class_probability_map) 
                     part_5 = T.sum(classification_errors)  
 
-            print("part_4", part_4)
-            print("part_5", part_5)
             return part_4 + part_5
 
         #extract data
@@ -1055,11 +1053,6 @@ class Yolo(BasicNetwork):
             part_5 = T.sum(classification_errors)   
 
         #combine parts 
-        print("part_1", part_1)
-        print("part_2", part_2)
-        print("part_3", part_3)
-        print("part_4", part_4)
-        print("part_5", part_5)
         total_loss = part_1 + part_2 + part_3 + part_4 + part_5
         return total_loss
 
