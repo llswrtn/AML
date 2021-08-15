@@ -444,7 +444,8 @@ class Yolo(BasicNetwork):
 
         #Conn Layers
         self.layer_15_full = nn.Linear(7*7*1024, 256)
-        self.layer_16_full = nn.Linear(256, 4069)
+        self.layer_16_dropout = nn.Dropout(self.dropout_p)
+        self.layer_17_full = nn.Linear(256, 4069)
         self.layer_last_full = nn.Linear(4069, self.out_layer_size)
 
     def initialize(self, device):
@@ -611,8 +612,10 @@ class Yolo(BasicNetwork):
         x = T.flatten(x, start_dim=1)
         x = F.leaky_relu(self.layer_15_full(x), negative_slope=self.leaky_slope)
         self.print_debug("layer_15_full", x.size())
-        x = F.leaky_relu(self.layer_16_full(x), negative_slope=self.leaky_slope)
-        self.print_debug("layer_16_full", x.size())
+        x = F.leaky_relu(self.layer_16_dropout(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_16_dropout", x.size())
+        x = F.leaky_relu(self.layer_17_full(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_17_full", x.size())
         return x
 
     def to_converted_box_data(self, separate_box_data):
