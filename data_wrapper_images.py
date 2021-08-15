@@ -112,9 +112,6 @@ class DataWrapperImages:
                 self.lut_study_id_to_list_image_id[study_id] = [image_id]
                 self.lut_study_id_to_list_image_index[study_id] = [image_index]
         
-        #print(self.lut_study_id_to_list_image_id)
-        #sys.exit(1)
-
     def load_annotated_list(self):
         """
         There are problems with the provided data. Some of the images have missing annotations.
@@ -204,15 +201,6 @@ class DataWrapperImages:
 
         print("annotated_list:", len(self.annotated_list))
         print("unannotated_list:", len(self.unannotated_list))
-
-
-        sys.exit(1)
-        #self.lut_image_id_to_image_index = {}
-        #self.lut_image_index_to_image_id = {}
-        #self.lut_image_id_to_study_id = {}
-        #self.lut_image_index_to_study_id = {}
-        #self.lut_study_id_to_list_image_id = {}
-        #self.lut_study_id_to_list_image_index = {}
 
     def load_data_set_boxes(self):
         """

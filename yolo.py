@@ -64,11 +64,31 @@ Determines how multiple class predictions (from multiple boxes) result in a sing
 PREDICTION_MAX = 0
 PREDICTION_MAX_MEAN = 1
 
+"""
+prediction_method_no_boxes:
+Determines how predictions should be handled if no boxes remain after non maximum suppression
+
+- PREDICTION_NO_BOXES_ALWAYS_NEGATIVE_FOR_PNEUMONIA:
+    return 'Negative for Pneumonia' if no boxes remain after non maximum suppression.
+    the problem is that there are cases with "Atypical Appearance" but no boxes.
+
+- PREDICTION_NO_BOXES_FALLBACK:
+    use converted_box_data instead of filtered_converted_box_data
+
+- PREDICTION_NO_BOXES_FALLBACK_IGNORE_CONFIDENCE:
+    use the highest class probability while ignoring box confidence.
+    the motivation for this is that the confidence should be low if there are no boxes.
+
+"""
+PREDICTION_NO_BOXES_ALWAYS_NEGATIVE_FOR_PNEUMONIA = 0
+PREDICTION_NO_BOXES_FALLBACK = 1
+PREDICTION_NO_BOXES_FALLBACK_IGNORE_CONFIDENCE = 2
+
 class Yolo(BasicNetwork):
     """
     Base class for the yolo networks
     """
-    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, architecture=ARCHITECTURE_DEFAULT, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True, prediction_method=PREDICTION_MAX):
+    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, architecture=ARCHITECTURE_DEFAULT, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True, prediction_method=PREDICTION_MAX, prediction_method_no_boxes=PREDICTION_NO_BOXES_FALLBACK_IGNORE_CONFIDENCE):
         super(Yolo, self).__init__()        
         print("init Yolo")
         self.leaky_slope = 0.1  
@@ -77,6 +97,7 @@ class Yolo(BasicNetwork):
         self.dropout_p = dropout_p
         self.architecture = architecture
         self.prediction_method = prediction_method
+        self.prediction_method_no_boxes = prediction_method_no_boxes
         self.iou_mode = iou_mode
         self.activation_mode = activation_mode
         self.clamp_box_dimensions = clamp_box_dimensions  
@@ -868,7 +889,7 @@ class Yolo(BasicNetwork):
         for i in range(batch_size):
             converted_box_data = self.prepare_data(i, forward_result)
             _, filtered_converted_box_data, _ = self.non_max_suppression(converted_box_data, iou_threshold=iou_threshold, score_threshold=score_threshold)    
-            predictions_i = self.get_class_prediction(filtered_converted_box_data)
+            predictions_i = self.get_class_prediction(filtered_converted_box_data, converted_box_data)
             predictions[i] = predictions_i
         return predictions
 
@@ -892,7 +913,7 @@ class Yolo(BasicNetwork):
             loss_i = self.get_loss(converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord=lambda_coord, lambda_noobj=lambda_noobj)
             total_loss += loss_i
             #predictions
-            predictions_i = self.get_class_prediction(filtered_converted_box_data)
+            predictions_i = self.get_class_prediction(filtered_converted_box_data, converted_box_data)
             predictions[i] = predictions_i
             #list of box tensors
             list_filtered_converted_box_data[i] = None   
@@ -1005,37 +1026,58 @@ class Yolo(BasicNetwork):
         total_loss = part_1 + part_2 + part_3 + part_4 + part_5
         return total_loss
 
-    def get_class_prediction(self, filtered_converted_box_data):
-        data = np.array([
+    def get_class_prediction(self, filtered_converted_box_data, converted_box_data):
+        """
+        Predict the one hot encoded image label.
+        How this is done depends on prediction_method and prediction_method_no_boxes,
+        which are both explained at the top of yolo.py.
+        """
+
+        """
+        #for testing
+        test_data = np.array([
             [0.5, 0.5, 0.6, 0.6, 0.8, 0.1, 0.5, 0.1, 0.1],
             [0.5, 0.5, 0.6, 0.6, 0.9, 0.1, 0.1, 0.5, 0.1],
             [0.7, 0.7, 0.8, 0.8, 0.7, 0.1, 0.5, 0.1, 0.1]
         ])
-        filtered_converted_box_data = T.tensor(data, dtype=T.float32)
-        
-        #special case for no boxes predicted --> no pneumonia
+        filtered_converted_box_data = T.tensor(test_data, dtype=T.float32)
+        """
+        data = filtered_converted_box_data
+        #special case for no boxes predicted:
         if filtered_converted_box_data.shape[0] == 0:
-            no_pneumonia = T.zeros((1, self.C))
-            no_pneumonia[0,0] = 1
-            return no_pneumonia
+            #we could just return "Negative for Pneumonia" 
+            #but there seem to be cases with "Atypical Appearance" but no boxes
+            if self.prediction_method_no_boxes == PREDICTION_NO_BOXES_ALWAYS_NEGATIVE_FOR_PNEUMONIA:
+                no_pneumonia = T.zeros((1, self.C))
+                no_pneumonia[0,0] = 1
+                return no_pneumonia  
+            #an alternative is to use converted_box_data instead of filtered_converted_box_data
+            data = converted_box_data
 
-        #if at least one box was predicted, calculate class specific confidence
-        confidences = filtered_converted_box_data[:, 4]
+        #calculate class specific confidence from confidences and class probabilities
+        confidences = data[:, 4]
         confidences = T.reshape(confidences, (*confidences.shape, 1))
-        probabilities = filtered_converted_box_data[:, 5:]
+        probabilities = data[:, 5:]
         class_specific_confidence = confidences * probabilities
+        score = class_specific_confidence
+
+        #special case for no boxes predicted:
+        if filtered_converted_box_data.shape[0] == 0:
+            #special case for no boxes predicted:
+            if self.prediction_method_no_boxes == PREDICTION_NO_BOXES_FALLBACK_IGNORE_CONFIDENCE:
+                score = probabilities
 
         #there are multiple ways to obtain a single class prediction
         #method 1: use the highest class specific confidence found
         if self.prediction_method == PREDICTION_MAX:
-            max_cscs = T.max(class_specific_confidence, dim=0).values
+            max_cscs = T.max(score, dim=0).values
             index = T.argmax(max_cscs)
             prediction = T.zeros((1, self.C))
             prediction[0,index] = 1
             return prediction
         #method 2: use the highest mean class specific confidence found
         if self.prediction_method == PREDICTION_MAX_MEAN:
-            mean_cscs = T.mean(class_specific_confidence, dim=0)
+            mean_cscs = T.mean(score, dim=0)
             index = T.argmax(mean_cscs)
             prediction = T.zeros((1, self.C))
             prediction[0,index] = 1
