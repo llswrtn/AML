@@ -5,8 +5,8 @@ class YoloCellBased(Yolo):
     Cell based Yolo network.
     Each cell predicts the class independently.
     """
-    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, architecture=ARCHITECTURE_DEFAULT, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True):
-        super(YoloCellBased, self).__init__(number_of_classes=number_of_classes, boxes_per_cell=boxes_per_cell, dropout_p=dropout_p, architecture=architecture, iou_mode=iou_mode, activation_mode=activation_mode, clamp_box_dimensions=clamp_box_dimensions)        
+    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, architecture=ARCHITECTURE_DEFAULT, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True, prediction_method=PREDICTION_MAX):
+        super(YoloCellBased, self).__init__(number_of_classes=number_of_classes, boxes_per_cell=boxes_per_cell, dropout_p=dropout_p, architecture=architecture, iou_mode=iou_mode, activation_mode=activation_mode, clamp_box_dimensions=clamp_box_dimensions, prediction_method=prediction_method)        
         print("init YoloCellBased")
       
     def init_helper_variables(self):

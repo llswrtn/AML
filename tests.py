@@ -2,6 +2,8 @@ from data_wrapper_images import DataWrapperImages
 from yolo import Yolo
 from yolo import ARCHITECTURE_DEFAULT
 from yolo import ARCHITECTURE_FAST
+from yolo import PREDICTION_MAX
+from yolo import PREDICTION_MAX_MEAN
 from yolo_cell_based import YoloCellBased
 from yolo_image_based import YoloImageBased
 from plot_boxes import *
@@ -196,7 +198,10 @@ def test_loss(device, yolo, data_wrapper_images):
     print("batch_labels.shape", batch_labels.shape)
     forward_result = yolo(batch_images)
     #call loss function for batch
-    yolo.get_batch_loss(forward_result, batch_boxes, batch_labels)
+    loss = yolo.get_batch_loss(forward_result, batch_boxes, batch_labels)
+    predictions = yolo.get_batch_class_predictions(forward_result)
+    print("predictions", predictions)
+    print("batch_labels", batch_labels)
 
 def test_data(data_wrapper_images, device):    
     print("test_data")
@@ -226,6 +231,7 @@ def run_tests(device, data_wrapper_images):
     #test_iou(device)
     #yolo = YoloCellBased(number_of_classes=4, boxes_per_cell=2).to(device)
     #yolo = YoloImageBased(number_of_classes=4, boxes_per_cell=2).to(device)
+    #yolo = YoloCellBased(number_of_classes=4, boxes_per_cell=2, architecture=ARCHITECTURE_FAST).to(device)
     yolo = YoloImageBased(number_of_classes=4, boxes_per_cell=2, architecture=ARCHITECTURE_FAST).to(device)
     yolo.initialize(device)
     #test_get_intersected_cells(device, yolo)

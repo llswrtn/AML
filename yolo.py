@@ -14,6 +14,7 @@ Each ground truth box has exactly one prediction that is responsible for it.
 """
 IOU_MODE_ALL = 0
 IOU_MODE_BOX_CENTER = 1
+
 """
 activation_mode:
 Each ground truth box has exactly one prediction that is responsible for it.
@@ -36,6 +37,7 @@ ACTIVATION_MODE_LINEAR = 0
 ACTIVATION_MODE_SIGMOID = 1
 ACTIVATION_MODE_CLAMP_COORDINATES = 2
 ACTIVATION_MODE_SIGMOID_COORDINATES = 3
+
 """
 architecture:
 Determines which layer architecture is used.
@@ -49,12 +51,24 @@ Determines which layer architecture is used.
 ARCHITECTURE_DEFAULT = 0
 ARCHITECTURE_FAST = 1
 
+"""
+prediction_method:
+Determines how multiple class predictions (from multiple boxes) result in a single class prediction for the image.
+
+- PREDICTION_MAX: 
+    use the highest class specific confidence found
+
+- PREDICTION_MAX_MEAN: 
+    use the highest mean class specific confidence found
+"""
+PREDICTION_MAX = 0
+PREDICTION_MAX_MEAN = 1
 
 class Yolo(BasicNetwork):
     """
     Base class for the yolo networks
     """
-    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, architecture=ARCHITECTURE_DEFAULT, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True):
+    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, architecture=ARCHITECTURE_DEFAULT, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True, prediction_method=PREDICTION_MAX):
         super(Yolo, self).__init__()        
         print("init Yolo")
         self.leaky_slope = 0.1  
@@ -62,6 +76,7 @@ class Yolo(BasicNetwork):
         self.boxes_per_cell = boxes_per_cell
         self.dropout_p = dropout_p
         self.architecture = architecture
+        self.prediction_method = prediction_method
         self.iou_mode = iou_mode
         self.activation_mode = activation_mode
         self.clamp_box_dimensions = clamp_box_dimensions  
@@ -841,8 +856,7 @@ class Yolo(BasicNetwork):
         """
         Calculates loss for an entire batch.
 
-        :param forward_result: the tensor obtained from forward.
- 
+        :param forward_result: the tensor obtained from forward. 
         """
         print("get_batch_loss")
         print(forward_result.shape)
@@ -855,6 +869,34 @@ class Yolo(BasicNetwork):
             loss_i = self.get_loss(converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord=lambda_coord, lambda_noobj=lambda_noobj)
             total_loss += loss_i
         print("total_loss", total_loss)
+        return total_loss
+
+    def get_batch_class_predictions(self, forward_result):
+        """
+        Get class predictions for an entire batch.
+
+        :param forward_result: the tensor obtained from forward. 
+        """
+        print("get_batch_class_predictions")
+        print(forward_result.shape)
+        batch_size = forward_result.shape[0]
+        predictions = T.empty((batch_size, self.C))
+        for i in range(batch_size):
+            print("batch element i", i)
+            converted_box_data = self.prepare_data(i, forward_result)
+            _, filtered_converted_box_data, _ = self.non_max_suppression(converted_box_data)    
+            predictions_i = self.get_class_prediction(filtered_converted_box_data)
+            print("predictions_i", predictions_i)
+            predictions[i] = predictions_i
+        return predictions
+
+    def get_batch_loss_and_class_predictions_and_boxes(self, forward):
+        """
+        The functions get_batch_loss and get_batch_class_predictions both compute the converted_box_data.
+        To save computation time, this method combines those methods
+
+        :param forward_result: the tensor obtained from forward. 
+        """
         
     def get_loss(self, converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord = 5, lambda_noobj = 0.5):
         """
@@ -982,3 +1024,55 @@ class Yolo(BasicNetwork):
         total_loss = part_1 + part_2 + part_3 + part_4 + part_5
         print("total_loss", total_loss)  
         return total_loss
+
+    def get_class_prediction(self, filtered_converted_box_data):
+        data = np.array([
+            [0.5, 0.5, 0.6, 0.6, 0.8, 0.1, 0.5, 0.1, 0.1],
+            [0.5, 0.5, 0.6, 0.6, 0.9, 0.1, 0.1, 0.5, 0.1],
+            [0.7, 0.7, 0.8, 0.8, 0.7, 0.1, 0.5, 0.1, 0.1]
+        ])
+        filtered_converted_box_data = T.tensor(data, dtype=T.float32)
+        
+        #special case for no boxes predicted --> no pneumonia
+        if filtered_converted_box_data.shape[0] == 0:
+            print("no boxes remain")
+            no_pneumonia = T.zeros((1, self.C))
+            no_pneumonia[0,0] = 1
+            return no_pneumonia
+
+        #if at least one box was predicted, calculate class specific confidence
+        confidences = filtered_converted_box_data[:, 4]
+        confidences = T.reshape(confidences, (*confidences.shape, 1))
+        probabilities = filtered_converted_box_data[:, 5:]
+        class_specific_confidence = confidences * probabilities
+        print("confidences", confidences)
+        print("probabilities", probabilities)
+        print("class_specific_confidence", class_specific_confidence)
+
+        #there are multiple ways to obtain a single class prediction
+        #method 1: use the highest class specific confidence found
+        if self.prediction_method == PREDICTION_MAX:
+            max_cscs = T.max(class_specific_confidence, dim=0).values
+            index = T.argmax(max_cscs)
+            #row_indices = T.argmax(class_specific_confidence, dim=0)
+            #max_cscs = class_specific_confidence[row_indices]
+            #print("row_indices", row_indices)
+            print("max_cscs", max_cscs)
+            print("index", index)
+            prediction = T.zeros((1, self.C))
+            prediction[0,index] = 1
+            print("prediction", prediction)
+            return prediction
+        #method 2: use the highest mean class specific confidence found
+        if self.prediction_method == PREDICTION_MAX_MEAN:
+            mean_cscs = T.mean(class_specific_confidence, dim=0)
+            index = T.argmax(mean_cscs)
+            print("mean_cscs", mean_cscs)
+            print("index", index)
+            prediction = T.zeros((1, self.C))
+            prediction[0,index] = 1
+            print("prediction", prediction)
+            return prediction
+
+        print("unknown prediction method", self.prediction_method.shape)
+        sys.exit()
