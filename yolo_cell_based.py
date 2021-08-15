@@ -5,9 +5,10 @@ class YoloCellBased(Yolo):
     Cell based Yolo network.
     Each cell predicts the class independently.
     """
-    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, architecture=ARCHITECTURE_DEFAULT, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True, prediction_method=PREDICTION_MAX, prediction_method_no_boxes=PREDICTION_NO_BOXES_FALLBACK_IGNORE_CONFIDENCE):
-        super(YoloCellBased, self).__init__(number_of_classes=number_of_classes, boxes_per_cell=boxes_per_cell, dropout_p=dropout_p, architecture=architecture, iou_mode=iou_mode, activation_mode=activation_mode, clamp_box_dimensions=clamp_box_dimensions, prediction_method=prediction_method, prediction_method_no_boxes=prediction_method_no_boxes)        
+    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, architecture=ARCHITECTURE_DEFAULT, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True, prediction_method=PREDICTION_MAX, prediction_method_no_boxes=PREDICTION_NO_BOXES_FALLBACK_IGNORE_CONFIDENCE, allow_classification_error=True, allow_classification_error_no_boxes=True):
+        super(YoloCellBased, self).__init__(number_of_classes=number_of_classes, boxes_per_cell=boxes_per_cell, dropout_p=dropout_p, architecture=architecture, iou_mode=iou_mode, activation_mode=activation_mode, clamp_box_dimensions=clamp_box_dimensions, prediction_method=prediction_method, prediction_method_no_boxes=prediction_method_no_boxes, allow_classification_error=allow_classification_error, allow_classification_error_no_boxes=allow_classification_error_no_boxes)        
         print("init YoloCellBased")
+        self.is_image_based = False
       
     def init_helper_variables(self):
         self.values_per_cell = self.B*5+self.C
