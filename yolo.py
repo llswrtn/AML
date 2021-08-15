@@ -87,8 +87,21 @@ PREDICTION_NO_BOXES_FALLBACK_IGNORE_CONFIDENCE = 2
 class Yolo(BasicNetwork):
     """
     Base class for the yolo networks
+
+    :param allow_classification_error: If disabled, the classification error in the loss function
+    is skipped. Useful if we are not interested in classification and only care about the boxes.
+
+    :param allow_classification_error_no_boxes: WARNING, this is independent of allow_classification_error
+    and must be deactivated separately. If disabled, the classification error in the loss function
+    is skipped if there are no ground truth boxes. Should probably be diabled for yolo_cell_based.
+    Useful if we are not interested in classification and only care about the boxes. 
+
+    :param clamp_box_dimensions: linear activation allows negative width and height, which is not supported.
+    If a linear activation_mode is chosen, this might be neccessary.
+
+    For the other parameters see above.
     """
-    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, architecture=ARCHITECTURE_DEFAULT, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True, prediction_method=PREDICTION_MAX, prediction_method_no_boxes=PREDICTION_NO_BOXES_FALLBACK_IGNORE_CONFIDENCE):
+    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, architecture=ARCHITECTURE_DEFAULT, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True, prediction_method=PREDICTION_MAX, prediction_method_no_boxes=PREDICTION_NO_BOXES_FALLBACK_IGNORE_CONFIDENCE, allow_classification_error=True, allow_classification_error_no_boxes=True):
         super(Yolo, self).__init__()        
         print("init Yolo")
         self.leaky_slope = 0.1  
@@ -101,6 +114,8 @@ class Yolo(BasicNetwork):
         self.iou_mode = iou_mode
         self.activation_mode = activation_mode
         self.clamp_box_dimensions = clamp_box_dimensions  
+        self.allow_classification_error = allow_classification_error
+        self.allow_classification_error_no_boxes = allow_classification_error_no_boxes
         #alternative names for easier use
         self.B = boxes_per_cell
         self.C = number_of_classes        
@@ -933,6 +948,9 @@ class Yolo(BasicNetwork):
         In this task there is only one label for all boxes of an image     
         """
         #if there are no boxes, only penalize confidence of all boxes and class predictions
+        #PART 1, 2, and 3 are 0 because no cell is responsible for any object
+        #PART 5 is 0 in the YOLO paper, but since our task is different, it might be useful to
+        #penalize classification error. this is controlled by allow_classification_error_no_boxes.
         if ground_truth_boxes is None:
             converted_box_data_c = converted_box_data[:,4]
             class_probability_map = self.get_class_probability_map(converted_box_data)
@@ -944,9 +962,20 @@ class Yolo(BasicNetwork):
             part_4 = lambda_noobj * T.sum(box_noobj_confidence_errors)
 
             #PART 5: classification error
-            classification_errors = T.square(ground_truth_label - class_probability_map) 
-            part_5 = T.sum(classification_errors)
+            part_5 = 0
+            if self.allow_classification_error_no_boxes:
+                if self.is_image_based:
+                    #for yolo_image_based we only have one class prediction shared by all boxes.
+                    classification_errors = T.square(ground_truth_label - class_probability_map[0]) 
+                    part_5 = T.sum(classification_errors)
+                else:
+                    #for yolo_cell_based we probably do not want allow_classification_error_no_boxes,
+                    #but if it is active, use all probabilities?
+                    classification_errors = T.square(ground_truth_label - class_probability_map) 
+                    part_5 = T.sum(classification_errors)  
 
+            print("part_4", part_4)
+            print("part_5", part_5)
             return part_4 + part_5
 
         #extract data
@@ -1019,10 +1048,18 @@ class Yolo(BasicNetwork):
 
 
         #PART 5: classification error
-        classification_errors = intersected_cells_1_any_box * T.square(ground_truth_label - class_probability_map)
-        part_5 = T.sum(classification_errors)   
+        #this can be disabled if we are not interested in classification and only care about the boxes
+        part_5 = 0
+        if self.allow_classification_error:            
+            classification_errors = intersected_cells_1_any_box * T.square(ground_truth_label - class_probability_map)
+            part_5 = T.sum(classification_errors)   
 
         #combine parts 
+        print("part_1", part_1)
+        print("part_2", part_2)
+        print("part_3", part_3)
+        print("part_4", part_4)
+        print("part_5", part_5)
         total_loss = part_1 + part_2 + part_3 + part_4 + part_5
         return total_loss
 
