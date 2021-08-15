@@ -36,17 +36,22 @@ ACTIVATION_MODE_SIGMOID = 1
 ACTIVATION_MODE_CLAMP_COORDINATES = 2
 ACTIVATION_MODE_SIGMOID_COORDINATES = 3
 
+ARCHITECTURE_DEFAULT = 0
+ARCHITECTURE_FAST = 1
+
+
 class Yolo(BasicNetwork):
     """
     Base class for the yolo networks
     """
-    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True):
+    def __init__(self, number_of_classes=4, boxes_per_cell=2, dropout_p=0.5, architecture=ARCHITECTURE_DEFAULT, iou_mode=IOU_MODE_BOX_CENTER, activation_mode=ACTIVATION_MODE_LINEAR, clamp_box_dimensions=True):
         super(Yolo, self).__init__()        
         print("init Yolo")
         self.leaky_slope = 0.1  
         self.number_of_classes = number_of_classes
         self.boxes_per_cell = boxes_per_cell
         self.dropout_p = dropout_p
+        self.architecture = architecture
         self.iou_mode = iou_mode
         self.activation_mode = activation_mode
         self.clamp_box_dimensions = clamp_box_dimensions  
@@ -56,9 +61,17 @@ class Yolo(BasicNetwork):
         self.S = 7
         #helper variables
         self.init_helper_variables()   
-        #setup layers
-      
+        #setup layers depending on the selected yolo architecture
+        if self.architecture == ARCHITECTURE_DEFAULT:
+            self.generate_layers_default()
+        elif self.architecture == ARCHITECTURE_FAST:
+            self.generate_layers_fast()
+        else:
+            print("unknown architecture: ", self.architecture)
+            sys.exit(1)
 
+    def generate_layers_default(self):
+        print("generate_layers_default")
         #region COLUMN 0
         #Conv. Layer 7x7x64-s-2
         self.layer_0_conv = nn.Conv2d(
@@ -281,13 +294,16 @@ class Yolo(BasicNetwork):
         #endregion
 
         #region DROPOUT
-        self.layer_29_dropout = nn.Dropout(dropout_p)
+        self.layer_29_dropout = nn.Dropout(self.dropout_p)
         #endregion
 
         #region COLUMN 7
         #Conn Layer
         self.layer_30_full = nn.Linear(4069, self.out_layer_size)
         #endregion
+
+    def generate_layers_fast(self):
+        pass
 
     def initialize(self, device):
         self.device = device
@@ -333,7 +349,23 @@ class Yolo(BasicNetwork):
         self.coordinate_index_list = T.flatten(self.coordinate_index_list).to(self.device)
 
     def forward(self, x):     
-        #print("forward:", x.size())
+        #apply layers depending on the selected yolo architecture
+        if self.architecture == ARCHITECTURE_DEFAULT:
+            x = self.apply_layers_default(x)
+        elif self.architecture == ARCHITECTURE_FAST:
+            x = self.apply_layers_fast(x)
+        else:
+            print("unknown architecture: ", self.architecture)
+            sys.exit(1)
+        #last layer:
+        x = self.apply_last_layer(x)
+        self.print_debug("return x.shape", x.shape)
+        return x
+
+    def apply_layers_default(self, x):
+        """
+        Applies the default yolo layers except the last layer
+        """
         x = F.leaky_relu(self.layer_0_conv(x), negative_slope=self.leaky_slope)
         self.print_debug("layer_0_conv", x.size())
         x = F.leaky_relu(self.layer_1_maxpool(x), negative_slope=self.leaky_slope)
@@ -397,10 +429,9 @@ class Yolo(BasicNetwork):
         self.print_debug("layer_28_full", x.size())
         x = F.leaky_relu(self.layer_29_dropout(x), negative_slope=self.leaky_slope)
         self.print_debug("layer_29_dropout", x.size())
-        
-        #last layer:
-        x = self.apply_last_layer(x)
-        self.print_debug("return x.shape", x.shape)
+        return x
+
+    def apply_layers_fast(self, x):
         return x
 
     def to_converted_box_data(self, separate_box_data):
