@@ -8,6 +8,7 @@ Each ground truth box has exactly one prediction that is responsible for it.
     In this mode, the responsible box is the box with highest IOU of all S*S*B boxes.
 
 - IOU_MODE_BOX_CENTER: 
+    This is probably the better version.
     In this mode, the responsible box is the box with highest IOU of all B boxes that are in the grid cell
     where the center of the ground truth box falls into.
 """
@@ -35,7 +36,16 @@ ACTIVATION_MODE_LINEAR = 0
 ACTIVATION_MODE_SIGMOID = 1
 ACTIVATION_MODE_CLAMP_COORDINATES = 2
 ACTIVATION_MODE_SIGMOID_COORDINATES = 3
+"""
+architecture:
+Determines which layer architecture is used.
 
+- ARCHITECTURE_DEFAULT: 
+    24 convolution YOLO network described in the paper
+
+- ARCHITECTURE_FAST: 
+    9 convolution YOLO network mentioned in the paper
+"""
 ARCHITECTURE_DEFAULT = 0
 ARCHITECTURE_FAST = 1
 
