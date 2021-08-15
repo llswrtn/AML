@@ -199,9 +199,16 @@ def test_loss(device, yolo, data_wrapper_images):
     forward_result = yolo(batch_images)
     #call loss function for batch
     loss = yolo.get_batch_loss(forward_result, batch_boxes, batch_labels)
+    #call prediction function for batch
     predictions = yolo.get_batch_class_predictions(forward_result)
     print("predictions", predictions)
     print("batch_labels", batch_labels)
+
+    total_loss, predictions, list_filtered_converted_box_data = yolo.get_batch_loss_and_class_predictions_and_boxes(forward_result, batch_boxes, batch_labels)
+    print("total_loss", total_loss)
+    print("predictions", predictions)
+    print("list_filtered_converted_box_data", list_filtered_converted_box_data)
+
 
 def test_data(data_wrapper_images, device):    
     print("test_data")

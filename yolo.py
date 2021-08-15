@@ -871,7 +871,7 @@ class Yolo(BasicNetwork):
         print("total_loss", total_loss)
         return total_loss
 
-    def get_batch_class_predictions(self, forward_result):
+    def get_batch_class_predictions(self, forward_result, iou_threshold=0.5, score_threshold=0.5):
         """
         Get class predictions for an entire batch.
 
@@ -884,19 +884,43 @@ class Yolo(BasicNetwork):
         for i in range(batch_size):
             print("batch element i", i)
             converted_box_data = self.prepare_data(i, forward_result)
-            _, filtered_converted_box_data, _ = self.non_max_suppression(converted_box_data)    
+            _, filtered_converted_box_data, _ = self.non_max_suppression(converted_box_data, iou_threshold=iou_threshold, score_threshold=score_threshold)    
             predictions_i = self.get_class_prediction(filtered_converted_box_data)
             print("predictions_i", predictions_i)
             predictions[i] = predictions_i
         return predictions
 
-    def get_batch_loss_and_class_predictions_and_boxes(self, forward):
+    def get_batch_loss_and_class_predictions_and_boxes(self, forward_result, batch_boxes, batch_labels, lambda_coord = 5, lambda_noobj = 0.5, iou_threshold=0.5, score_threshold=0.5):
         """
         The functions get_batch_loss and get_batch_class_predictions both compute the converted_box_data.
         To save computation time, this method combines those methods
 
         :param forward_result: the tensor obtained from forward. 
         """
+        print("get_batch_loss_and_class_predictions_and_boxes")
+        print(forward_result.shape)
+        batch_size = forward_result.shape[0]
+        predictions = T.empty((batch_size, self.C))
+        total_loss = 0
+        list_filtered_converted_box_data = [None] * batch_size
+        for i in range(batch_size):
+            print("batch element i", i)
+            converted_box_data = self.prepare_data(i, forward_result)
+            _, filtered_converted_box_data, _ = self.non_max_suppression(converted_box_data, iou_threshold=iou_threshold, score_threshold=score_threshold)    
+            #loss
+            ground_truth_boxes = batch_boxes[i]
+            ground_truth_label = batch_labels[i]
+            loss_i = self.get_loss(converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord=lambda_coord, lambda_noobj=lambda_noobj)
+            total_loss += loss_i
+            #predictions
+            predictions_i = self.get_class_prediction(filtered_converted_box_data)
+            print("predictions_i", predictions_i)
+            predictions[i] = predictions_i
+            #list of box tensors
+            list_filtered_converted_box_data[i] = None   
+            if filtered_converted_box_data.shape[0] > 0:       
+                list_filtered_converted_box_data[i] = filtered_converted_box_data
+        return total_loss, predictions, list_filtered_converted_box_data
         
     def get_loss(self, converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord = 5, lambda_noobj = 0.5):
         """
