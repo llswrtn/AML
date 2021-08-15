@@ -15,8 +15,8 @@ class YoloImageBased(Yolo):
 
     def apply_last_layer(self, x):
         #first without activation
-        x = self.layer_30_full(x)
-        self.print_debug("layer_30_full", x.size())
+        x = self.layer_last_full(x)
+        self.print_debug("layer_last_full", x.size())
 
         #in the paper, the last layer uses linear activation instead of leaky_relu
         if self.activation_mode == ACTIVATION_MODE_LINEAR:

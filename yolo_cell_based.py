@@ -15,8 +15,8 @@ class YoloCellBased(Yolo):
 
     def apply_last_layer(self, x):
         #first without activation
-        x = self.layer_30_full(x)
-        self.print_debug("layer_30_full", x.size())
+        x = self.layer_last_full(x)
+        self.print_debug("layer_last_full", x.size())
         x = T.reshape(x, (x.shape[0], self.S, self.S, self.values_per_cell))
 
         #in the paper, the last layer uses linear activation instead of leaky_relu

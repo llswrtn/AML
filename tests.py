@@ -1,5 +1,7 @@
 from data_wrapper_images import DataWrapperImages
 from yolo import Yolo
+from yolo import ARCHITECTURE_DEFAULT
+from yolo import ARCHITECTURE_FAST
 from yolo_cell_based import YoloCellBased
 from yolo_image_based import YoloImageBased
 from plot_boxes import *
@@ -223,7 +225,8 @@ def run_tests(device, data_wrapper_images):
     #sys.exit(0)
     #test_iou(device)
     #yolo = YoloCellBased(number_of_classes=4, boxes_per_cell=2).to(device)
-    yolo = YoloImageBased(number_of_classes=4, boxes_per_cell=2).to(device)
+    #yolo = YoloImageBased(number_of_classes=4, boxes_per_cell=2).to(device)
+    yolo = YoloImageBased(number_of_classes=4, boxes_per_cell=2, architecture=ARCHITECTURE_FAST).to(device)
     yolo.initialize(device)
     #test_get_intersected_cells(device, yolo)
     #test_get_responsible_cells(device, yolo)

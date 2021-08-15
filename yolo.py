@@ -299,11 +299,128 @@ class Yolo(BasicNetwork):
 
         #region COLUMN 7
         #Conn Layer
-        self.layer_30_full = nn.Linear(4069, self.out_layer_size)
+        self.layer_last_full = nn.Linear(4069, self.out_layer_size)
         #endregion
 
     def generate_layers_fast(self):
-        pass
+        """
+        We assume kernel_size=3 for all convolutional layers
+        """
+        #1. convolution
+        #Conv. Layer 7x7x16
+        self.layer_0_conv = nn.Conv2d(
+            in_channels=1, 
+            out_channels=16, 
+            kernel_size=3, 
+            stride=1, 
+            padding=1)
+        #Maxpool Layer 2x2-s-2
+        self.layer_1_maxpool = nn.MaxPool2d(
+            kernel_size=2, 
+            stride=2, 
+            padding=0)
+
+        #2. convolution
+        #Conv. Layer 3x3x32
+        self.layer_2_conv = nn.Conv2d(
+            in_channels=16, 
+            out_channels=32, 
+            kernel_size=3, 
+            stride=1, 
+            padding=1)
+        #Maxpool Layer 2x2-s-2
+        self.layer_3_maxpool = nn.MaxPool2d(
+            kernel_size=2, 
+            stride=2, 
+            padding=0)
+
+        #3. convolution
+        #Conv. Layer 3x3x64
+        self.layer_4_conv = nn.Conv2d(
+            in_channels=32, 
+            out_channels=64, 
+            kernel_size=3, 
+            stride=1, 
+            padding=1)
+        #Maxpool Layer 2x2-s-2
+        self.layer_5_maxpool = nn.MaxPool2d(
+            kernel_size=2, 
+            stride=2, 
+            padding=0)
+
+        #4. convolution
+        #Conv. Layer 3x3x128
+        self.layer_6_conv = nn.Conv2d(
+            in_channels=64, 
+            out_channels=128, 
+            kernel_size=3, 
+            stride=1, 
+            padding=1)
+        #Maxpool Layer 2x2-s-2
+        self.layer_7_maxpool = nn.MaxPool2d(
+            kernel_size=2, 
+            stride=2, 
+            padding=0)
+
+        #5. convolution
+        #Conv. Layer 3x3x256
+        self.layer_8_conv = nn.Conv2d(
+            in_channels=128, 
+            out_channels=256, 
+            kernel_size=3, 
+            stride=1, 
+            padding=1)
+        #Maxpool Layer 2x2-s-2
+        self.layer_9_maxpool = nn.MaxPool2d(
+            kernel_size=2, 
+            stride=2, 
+            padding=0)
+
+        #6. convolution
+        #Conv. Layer 3x3x512
+        self.layer_10_conv = nn.Conv2d(
+            in_channels=256, 
+            out_channels=512, 
+            kernel_size=3, 
+            stride=1, 
+            padding=1)
+        #Maxpool Layer 2x2-s-2
+        self.layer_11_maxpool = nn.MaxPool2d(
+            kernel_size=2, 
+            stride=2, 
+            padding=0)
+
+        #7. convolution
+        #Conv. Layer 3x3x1024
+        self.layer_12_conv = nn.Conv2d(
+            in_channels=512, 
+            out_channels=1024, 
+            kernel_size=3, 
+            stride=1, 
+            padding=1)
+
+        #8. convolution
+        #Conv. Layer 3x3x1024
+        self.layer_13_conv = nn.Conv2d(
+            in_channels=1024, 
+            out_channels=1024, 
+            kernel_size=3, 
+            stride=1, 
+            padding=1)
+
+        #9. convolution
+        #Conv. Layer 3x3x1024
+        self.layer_14_conv = nn.Conv2d(
+            in_channels=1024, 
+            out_channels=1024, 
+            kernel_size=3, 
+            stride=1, 
+            padding=1)
+
+        #Conn Layers
+        self.layer_15_full = nn.Linear(7*7*1024, 256)
+        self.layer_16_full = nn.Linear(256, 4069)
+        self.layer_last_full = nn.Linear(4069, self.out_layer_size)
 
     def initialize(self, device):
         self.device = device
@@ -432,6 +549,45 @@ class Yolo(BasicNetwork):
         return x
 
     def apply_layers_fast(self, x):
+        x = self.layer_0_conv(x)#no activation because next layer is maxpool, followed by activation
+        self.print_debug("layer_0_conv", x.size())
+        x = F.leaky_relu(self.layer_1_maxpool(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_1_maxpool", x.size())
+        x = self.layer_2_conv(x)#no activation because next layer is maxpool, followed by activation
+        self.print_debug("layer_2_conv", x.size())
+        x = F.leaky_relu(self.layer_3_maxpool(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_3_maxpool", x.size())
+        x = self.layer_4_conv(x)#no activation because next layer is maxpool, followed by activation
+        self.print_debug("layer_4_conv", x.size())
+        x = F.leaky_relu(self.layer_5_maxpool(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_5_maxpool", x.size())
+        x = self.layer_6_conv(x)#no activation because next layer is maxpool, followed by activation
+        self.print_debug("layer_6_conv", x.size())
+        x = F.leaky_relu(self.layer_7_maxpool(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_7_maxpool", x.size())
+        x = self.layer_8_conv(x)#no activation because next layer is maxpool, followed by activation
+        self.print_debug("layer_8_conv", x.size())
+        x = F.leaky_relu(self.layer_9_maxpool(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_9_maxpool", x.size())
+        x = self.layer_10_conv(x)#no activation because next layer is maxpool, followed by activation
+        self.print_debug("layer_10_conv", x.size())
+        x = F.leaky_relu(self.layer_11_maxpool(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_11_maxpool", x.size())
+
+        x = F.leaky_relu(self.layer_12_conv(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_12_conv", x.size())
+        x = F.leaky_relu(self.layer_13_conv(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_13_conv", x.size())
+        x = F.leaky_relu(self.layer_14_conv(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_14_conv", x.size())
+
+        #tensor needs to be flattened to 2d to work with fully connected layer
+        #first dimension for batch, second for the flattened part
+        x = T.flatten(x, start_dim=1)
+        x = F.leaky_relu(self.layer_15_full(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_15_full", x.size())
+        x = F.leaky_relu(self.layer_16_full(x), negative_slope=self.leaky_slope)
+        self.print_debug("layer_16_full", x.size())
         return x
 
     def to_converted_box_data(self, separate_box_data):
