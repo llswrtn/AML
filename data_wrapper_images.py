@@ -44,9 +44,11 @@ class DataWrapperImages:
     def load_data_set(self):
         print("load data set...")
         self.load_data_set_image_size_list()
-        self.load_data_set_images()
+        self.load_data_set_luts()
         self.load_data_set_boxes()
         self.load_data_set_labels()   
+        self.load_annotated_list()
+        self.load_data_set_images()
         print("load data completed")
         #print(self.images_448)
         #print(self.images_448.shape)
@@ -84,6 +86,133 @@ class DataWrapperImages:
                 path = self.path_448_list[i]
                 self.images_448[i] = np.load(path)
             print("loaded", self.images_448.shape, "images")
+
+    def load_data_set_luts(self):
+        print("load data set look up tables...")
+        self.lut_image_id_to_image_index = {}
+        self.lut_image_index_to_image_id = {}
+        self.lut_image_id_to_study_id = {}
+        self.lut_image_index_to_study_id = {}
+        self.lut_study_id_to_list_image_id = {}
+        self.lut_study_id_to_list_image_index = {}
+        for image_index in tqdm(range(self.num_total_images)):
+            image_id = self.data_frame.loc[image_index,"id"]
+            study_id = self.data_frame.loc[image_index,"StudyInstanceUID"]
+            self.lut_image_id_to_image_index[image_id] = image_index
+            self.lut_image_index_to_image_id[image_index] = image_id
+            self.lut_image_id_to_study_id[image_id] = study_id
+            self.lut_image_index_to_study_id[image_index] = study_id
+            #print(image_index, image_id, study_id)
+            if study_id in self.lut_study_id_to_list_image_id:
+                #append to entry
+                self.lut_study_id_to_list_image_id[study_id].append(image_id)
+                self.lut_study_id_to_list_image_index[study_id].append(image_index)
+            else:
+                #make new entry
+                self.lut_study_id_to_list_image_id[study_id] = [image_id]
+                self.lut_study_id_to_list_image_index[study_id] = [image_index]
+        
+        #print(self.lut_study_id_to_list_image_id)
+        #sys.exit(1)
+
+    def load_annotated_list(self):
+        """
+        There are problems with the provided data. Some of the images have missing annotations.
+        We therefore do not use images that have no bounding boxes if there is another image,
+        of the same study, that does have bounding boxes.
+        This is described in the following link:
+
+        https://www.kaggle.com/c/siim-covid19-detection/discussion/246597
+
+        Below is the full text from the above link:
+            Our annotation team updated the labels for the test datasets (private and public)
+            but the train labels remain the same.
+
+            The updated test labels correct the problem regarding duplicates or extra images
+            on some of the studies, which previously did not have bounding box information. 
+            Bounding box information is now provided for duplicates or similar images that are 
+            part of the same study for the public and private test datasets.
+
+            However, regarding the train labels, due to time constraints, those labels were 
+            kept the same and not updated. As such, in situations where there are 2 or more 
+            images belonging to a study, we recommend only using the labels for the image with 
+            the bounding boxes and disregard the other duplicate/similar images. These other 
+            duplicate/similar images were likely not looked at by the annotators as we were 
+            unaware of them during the initial annotation process. 
+        """
+        print("load annotated list...")
+        self.annotated_list = []
+        self.unannotated_list = []
+        num_no_boxes_in_annotated_list = 0
+        num_no_boxes = 0
+        for image_index in range(self.num_total_images):
+            boxes = self.ground_truth_boxes_list[image_index]
+            label = self.labels[image_index]
+            flag = True
+            if boxes is None:
+                num_no_boxes += 1
+                #in the case of no existing boxes we have to check if other images of the same study contain boxes.                
+                study_id = self.lut_image_index_to_study_id[image_index]
+                list_image_index = self.lut_study_id_to_list_image_index[study_id]
+                for _, other_image_index in enumerate(list_image_index):
+                    other_boxes = self.ground_truth_boxes_list[other_image_index]
+                    if not (other_boxes is None):
+                        #another image (other_image_index) of the same study contain boxes, 
+                        #which means that this image (image_index) was not annotated
+                        flag = False
+                #if no other box contains any boxes, our annotation containing no box is correct
+                if flag:
+                    num_no_boxes_in_annotated_list += 1
+            #add the image_index to the list of annotated images if the image either:
+            #   - contains boxes or 
+            #   - does not contain boxes, but no other image in the associated study does not contain boxes either
+            if flag:
+                self.annotated_list.append(image_index)
+            else:
+                self.unannotated_list.append(image_index)
+        
+        num_labels_all = np.zeros(4)
+        num_no_boxes_labels_all = np.zeros(4)
+        for image_index in range(self.num_total_images):
+            boxes = self.ground_truth_boxes_list[image_index]
+            label = self.labels[image_index]
+            num_labels_all += label
+            if boxes is None:
+                num_no_boxes_labels_all += label
+
+        num_no_boxes_labels_annotated = np.zeros(4, dtype=np.intc)
+        for _, image_index in enumerate(self.annotated_list):
+            boxes = self.ground_truth_boxes_list[image_index]
+            if boxes is None:
+                label = self.labels[image_index]
+                num_no_boxes_labels_annotated += label.astype(np.intc)
+
+        num_no_boxes_labels_unannotated = np.zeros(4, dtype=np.intc)
+        for _, image_index in enumerate(self.unannotated_list):
+            boxes = self.ground_truth_boxes_list[image_index]
+            if boxes is None:
+                label = self.labels[image_index]
+                num_no_boxes_labels_unannotated += label.astype(np.intc)
+
+        print("num_total_images:", self.num_total_images)
+        print("num_no_boxes:", num_no_boxes)
+        print("num_no_boxes_in_annotated_list:", num_no_boxes_in_annotated_list)
+        print("num_labels_all:", num_labels_all, "total:", np.sum(num_labels_all))
+        print("num_no_boxes_labels_all", num_no_boxes_labels_all, "total:", np.sum(num_no_boxes_labels_all))
+        print("num_no_boxes_labels_annotated", num_no_boxes_labels_annotated, "total:", np.sum(num_no_boxes_labels_annotated))
+        print("num_no_boxes_labels_unannotated", num_no_boxes_labels_unannotated, "total:", np.sum(num_no_boxes_labels_unannotated))
+
+        print("annotated_list:", len(self.annotated_list))
+        print("unannotated_list:", len(self.unannotated_list))
+
+
+        sys.exit(1)
+        #self.lut_image_id_to_image_index = {}
+        #self.lut_image_index_to_image_id = {}
+        #self.lut_image_id_to_study_id = {}
+        #self.lut_image_index_to_study_id = {}
+        #self.lut_study_id_to_list_image_id = {}
+        #self.lut_study_id_to_list_image_index = {}
 
     def load_data_set_boxes(self):
         """
