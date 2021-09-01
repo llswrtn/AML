@@ -10,14 +10,32 @@ import matplotlib.pyplot as plt
 import matplotlib
 import cairo
 
-def createSimpleDataSet(num_imgs = 50000, img_size = 8, min_object_size = 1, max_object_size = 4, 
-                        num_objects = 1, trainTestSplit = 0.8):
+import train
+
+
+def createDataset(num_imgs, img_size, min_object_size, max_object_size, num_objects, trainTestSplit, 
+                  datasetTyp, randomNumObj):
+    if (datasetTyp == "simple"):
+        return createSimpleDataSet(num_imgs, img_size, min_object_size, max_object_size, num_objects, 
+                                   trainTestSplit, randomNumObj)
+    elif (datasetTyp == "multiClasses"):
+        return createMultiClassesDataSet(num_imgs, img_size, min_object_size, max_object_size, num_objects, 
+                                   trainTestSplit, randomNumObj)
+    else:
+        print("X-ray not implemented yet")
+
+def createSimpleDataSet(num_imgs, img_size, min_object_size, max_object_size, num_objects, 
+                        trainTestSplit, randomNumObj):
     # Create images with random rectangles and bounding boxes. 
     bboxes = np.zeros((num_imgs, num_objects, 4))
     imgs = np.zeros((num_imgs, img_size, img_size))  # set background to 0
 
     for i_img in range(num_imgs):
-        for i_object in range(num_objects):
+        if (randomNumObj):
+            num_obj_in_image = np.random.randint(num_objects+1)
+        else:
+            num_obj_in_image = num_objects
+        for i_object in range(num_obj_in_image):
             w, h = np.random.randint(min_object_size, max_object_size, size=2)
             x = np.random.randint(0, img_size - w)
             y = np.random.randint(0, img_size - h)
@@ -48,8 +66,8 @@ def createSimpleDataSet(num_imgs = 50000, img_size = 8, min_object_size = 1, max
 
     return train_X, test_X, train_y, test_y, test_imgs, test_bboxes, 1, 0, 0
 
-def createMedicoreDataSet(num_imgs = 50000, img_size = 8, min_object_size = 1, max_object_size = 4, 
-                        num_objects = 1, trainTestSplit = 0.8):
+def createMultiClassesDataSet(num_imgs, img_size, min_object_size, max_object_size, 
+                        num_objects, trainTestSplit, randomNumObj):
     bboxes = np.zeros((num_imgs, num_objects, 4))
     imgs = np.zeros((num_imgs, img_size, img_size, 4), dtype=np.uint8)  # format: BGRA
     shapes = np.zeros((num_imgs, num_objects), dtype=int)
@@ -67,9 +85,12 @@ def createMedicoreDataSet(num_imgs = 50000, img_size = 8, min_object_size = 1, m
         cr.set_source_rgb(1, 1, 1)
         cr.paint()
         
-        # TODO: Try no overlap here.
         # Draw random shapes.
-        for i_object in range(num_objects):
+        if (randomNumObj):
+            num_obj_in_image = np.random.randint(num_objects+1)
+        else:
+            num_obj_in_image = num_objects
+        for i_object in range(num_obj_in_image):
             shape = np.random.randint(num_shapes)
             shapes[i_img, i_object] = shape
             if shape == 0:  # rectangle
@@ -95,7 +116,7 @@ def createMedicoreDataSet(num_imgs = 50000, img_size = 8, min_object_size = 1, m
                 cr.line_to(x, y)
                 cr.close_path()
             
-            # TODO: Introduce some variation to the colors by adding a small random offset to the rgb values.
+            # add noise to the colors
             color = np.random.randint(num_colors)
             colors[i_img, i_object] = color
             max_offset = 0.3
@@ -128,7 +149,6 @@ def createMedicoreDataSet(num_imgs = 50000, img_size = 8, min_object_size = 1, m
             shapes_onehot[i_img, i_object, shapes[i_img, i_object]] = 1
             
     y = np.concatenate([bboxes / img_size, shapes_onehot, colors_onehot], axis=-1).reshape(num_imgs, -1)
-    #y.shape, np.all(np.argmax(colors_onehot, axis=-1) == colors)
     
     
     # Split training and test.
@@ -141,24 +161,67 @@ def createMedicoreDataSet(num_imgs = 50000, img_size = 8, min_object_size = 1, m
     test_bboxes = bboxes[i:]
     test_shapes = shapes[i:]
     test_colors = colors[i:]
+    
+    train_X = np.swapaxes(train_X, 1,3)
+    train_X = np.swapaxes(train_X, 2,3)
+    test_X = np.swapaxes(test_X, 1,3)
+    test_X = np.swapaxes(test_X, 2,3)
     #train_imgs = imgs[:i]
     #train_bboxes = bboxes[:i]
-    
     
     return train_X, test_X, train_y, test_y, test_imgs, test_bboxes, 3, test_shapes, test_colors
 
 
 
-def plotImgSimpleDataset(img, bboxes):
-    plt.imshow(img.T, cmap='Greys', interpolation='none', origin='lower', extent=[0, img.shape[0], 0, img.shape[0]])
-    for bbox in bboxes:
-        plt.gca().add_patch(matplotlib.patches.Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], ec='r', fc='none'))
+def plotImgs(imgs, bboxes, shapes, colors, datasetTyp, idxImagesToPlot = [0], pred_bboxes = None, 
+             pred = False):
+    if (datasetTyp == "simple"):
+        return plotImgSimpleDataset(imgs, bboxes, idxImagesToPlot, pred_bboxes, pred)
+    elif (datasetTyp == "multiClasses"):
+        return plotImgMultiClassesDataset(imgs, bboxes, shapes, colors, idxImagesToPlot, pred_bboxes, pred)
+    else:
+        print("X-ray not implemented yet")
+
+def plotImgSimpleDataset(imgs, bboxes, idxImagesToPlot, pred_bboxes = None, pred = False):
+    plt.figure(figsize=(16, 8))
+    for i_subplot,idx in enumerate(idxImagesToPlot):
+        plt.subplot(1, len(idxImagesToPlot), i_subplot+1)
+        plt.imshow(imgs[idx].T, cmap='Greys', interpolation='none', origin='lower', extent=[0, imgs.shape[2], 0, imgs.shape[2]])
+        if (pred):
+            for pred_bbox, exp_bbox in zip(pred_bboxes[idx], bboxes[idx]):
+                if (pred_bbox[2] == 0.0 and pred_bbox[3] == 0.0):
+                    plt.gca().add_patch(matplotlib.patches.Rectangle((pred_bbox[0], pred_bbox[1]), pred_bbox[2], pred_bbox[3], ec='r', fc='none'))
+                    plt.annotate('IOU: {:.2f}'.format(train.IOU(pred_bbox, exp_bbox)), (pred_bbox[0], pred_bbox[1]+pred_bbox[3]+0.2), color='r')
+        else:
+            for bbox in bboxes[idx]:
+                if (bbox[2] == 0.0 and bbox[3] == 0.0):
+                    continue
+                plt.gca().add_patch(matplotlib.patches.Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], ec='r', fc='none'))
+       
+                 
+            
     
-def plotImgMedicoreDataset(img, bboxes, shapes, colors):
+def plotImgMultiClassesDataset(imgs, bboxes, shapes, colors, idxImagesToPlot, pred_bboxes = None, 
+                               pred = False):
     shape_labels = ['rectangle', 'circle', 'triangle']
     color_labels = ['r', 'g', 'b']
-    plt.imshow(img, interpolation='none', origin='lower', extent=[0, img.shape[0], 0, img.shape[0]])
-    for bbox, shape, color in zip(bboxes, shapes, colors):
-        plt.gca().add_patch(matplotlib.patches.Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], ec='k', fc='none'))
-        plt.annotate(shape_labels[shape], (bbox[0], bbox[1] + bbox[3] + 0.7), color=color_labels[color], clip_on=False)
-
+    plt.figure(figsize=(16, 8))
+    for i_subplot,idx in enumerate(idxImagesToPlot):
+        plt.subplot(2, 4, i_subplot+1)
+        plt.imshow(imgs[idx], interpolation='none', origin='lower', extent=[0, imgs.shape[2], 0, imgs.shape[2]])
+        if (pred):
+            for bbox, shape, color, exp_bbox in zip(pred_bboxes[idx], shapes[idx], colors[idx], bboxes[idx]):
+                if (bbox[2] == 0.0 and bbox[3] == 0.0):
+                    continue
+                plt.gca().add_patch(matplotlib.patches.Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], ec='k', fc='none'))
+                plt.annotate(shape_labels[shape], (bbox[0], bbox[1] + bbox[3] + 3.7), color=color_labels[color], clip_on=False, bbox={'fc': 'w', 'ec': 'none', 'pad': 1, 'alpha': 0.6})
+                plt.annotate('IOU: {:.2f}'.format(train.IOU(bbox, exp_bbox)), (bbox[0], bbox[1]+bbox[3]+0.2))
+        else:
+            for bbox, shape, color in zip(bboxes[idx], shapes[idx], colors[idx]):
+                if (bbox[2] == 0.0 and bbox[3] == 0.0):
+                    continue
+                plt.gca().add_patch(matplotlib.patches.Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], ec='k', fc='none'))
+                plt.annotate(shape_labels[shape], (bbox[0], bbox[1] + bbox[3] + 0.7), color=color_labels[color], clip_on=False)
+        
+            
+            
