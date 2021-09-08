@@ -351,7 +351,7 @@ class Yolo(BasicNetwork):
 
         #region COLUMN 6
         #Conn Layer
-        self.layer_28_full = nn.Linear(7*7*1024, 4069)
+        self.layer_28_full = nn.Linear(7*7*1024, 4096)
         #endregion
 
         #region DROPOUT
@@ -360,7 +360,7 @@ class Yolo(BasicNetwork):
 
         #region COLUMN 7
         #Conn Layer
-        self.layer_last_full = nn.Linear(4069, self.out_layer_size)
+        self.layer_last_full = nn.Linear(4096, self.out_layer_size)
         #endregion
 
     def generate_layers_fast(self):
@@ -481,8 +481,8 @@ class Yolo(BasicNetwork):
         #Conn Layers
         self.layer_15_full = nn.Linear(7*7*1024, 256)
         self.layer_16_dropout = nn.Dropout(self.dropout_p)
-        self.layer_17_full = nn.Linear(256, 4069)
-        self.layer_last_full = nn.Linear(4069, self.out_layer_size)
+        self.layer_17_full = nn.Linear(256, 4096)
+        self.layer_last_full = nn.Linear(4096, self.out_layer_size)
 
     def initialize(self, device):
         self.device = device
