@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+import torch as T
 
 class EpochData():
 
@@ -36,12 +37,12 @@ class EpochLogger():
         Add loss to the current epoch, can be either batch or individual loss.
         """
         epoch_data = self.list_epoch_data[self.epoch_index]
-        epoch_data.total_loss += total_loss
-        epoch_data.l1 += l1
-        epoch_data.l2 += l2
-        epoch_data.l3 += l3
-        epoch_data.l4 += l4
-        epoch_data.l5 += l5
+        epoch_data.total_loss += total_loss.item() if isinstance(total_loss, T.Tensor) else total_loss
+        epoch_data.l1 += l1.item() if isinstance(l1, T.Tensor) else l1
+        epoch_data.l2 += l2.item() if isinstance(l2, T.Tensor) else l2
+        epoch_data.l3 += l3.item() if isinstance(l3, T.Tensor) else l3
+        epoch_data.l4 += l4.item() if isinstance(l4, T.Tensor) else l4
+        epoch_data.l5 += l5.item() if isinstance(l5, T.Tensor) else l5
 
     def store(self):
         """

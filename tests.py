@@ -217,6 +217,10 @@ def test_loss(device, yolo, data_wrapper_images):
     print("predictions", predictions)
     print("list_filtered_converted_box_data", list_filtered_converted_box_data)
 
+    
+    epoch_logger_train = EpochLogger(name="epoch_logger_train",num_images=1000)
+    epoch_logger_train.start_epoch()
+    epoch_logger_train.add_loss(total_loss,part_1,part_2,part_3,part_4,part_5)
 
 def test_data(data_wrapper_images, device):    
     print("test_data")
