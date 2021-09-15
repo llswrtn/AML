@@ -7,6 +7,7 @@ from yolo import PREDICTION_MAX_MEAN
 from yolo_cell_based import YoloCellBased
 from yolo_image_based import YoloImageBased
 from plot_boxes import *
+from epoch_logger import *
 import torch as T
 import torchvision
 import numpy as np
@@ -232,8 +233,34 @@ def test_data(data_wrapper_images, device):
     #test_batch = data_wrapper_images.get_test_batch(78, batch_size) 
     #print("test_batch", test_batch)
 
+def test_epoch_logger():    
+    print("test_epoch_logger...")
+    epoch_logger_train = EpochLogger(name="epoch_logger_train",num_images=1000)
+    epoch_logger_validate = EpochLogger(name="epoch_logger_validate",num_images=200)
+
+    epoch_logger_train.start_epoch()
+    epoch_logger_train.add_loss(175,15,25,35,45,55)
+    epoch_logger_train.add_loss(50,10,10,10,10,10)
+
+    epoch_logger_validate.start_epoch()
+    epoch_logger_validate.add_loss(200,20,30,40,50,60)
+
+    epoch_logger_train.start_epoch()
+    epoch_logger_train.add_loss(110,10,10,20,30,40)
+    epoch_logger_train.add_loss(50,10,10,10,10,10)
+    
+    epoch_logger_validate.start_epoch()
+    epoch_logger_validate.add_loss(195,15,30,40,50,60)
+
+    epoch_logger_train.store()
+    epoch_logger_validate.store()
+    return
+
+
 def run_tests(device, data_wrapper_images):
     print("running tests...")
+    test_epoch_logger()
+    return
     test_data(data_wrapper_images, device)
     data_wrapper_images.test_get_image_path()
     #sys.exit(0)
