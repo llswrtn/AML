@@ -885,13 +885,23 @@ class Yolo(BasicNetwork):
         """
         batch_size = forward_result.shape[0]
         total_loss = 0
+        part_1 = 0
+        part_2 = 0
+        part_3 = 0
+        part_4 = 0
+        part_5 = 0
         for i in range(batch_size):
             converted_box_data = self.prepare_data(i, forward_result)
             ground_truth_boxes = batch_boxes[i]
             ground_truth_label = batch_labels[i]
-            loss_i = self.get_loss(converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord=lambda_coord, lambda_noobj=lambda_noobj)
-            total_loss += loss_i
-        return total_loss
+            total_loss_i, part_1_i, part_2_i, part_3_i, part_4_i, part_5_i = self.get_loss(converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord=lambda_coord, lambda_noobj=lambda_noobj)
+            total_loss += total_loss_i
+            part_1 += part_1_i
+            part_2 += part_2_i
+            part_3 += part_3_i
+            part_4 += part_4_i
+            part_5 += part_5_i
+        return total_loss, part_1, part_2, part_3, part_4, part_5
 
     def get_batch_class_predictions(self, forward_result, iou_threshold=0.5, score_threshold=0.5):
         """
@@ -918,6 +928,11 @@ class Yolo(BasicNetwork):
         batch_size = forward_result.shape[0]
         predictions = T.empty((batch_size, self.C))
         total_loss = 0
+        part_1 = 0
+        part_2 = 0
+        part_3 = 0
+        part_4 = 0
+        part_5 = 0
         list_filtered_converted_box_data = [None] * batch_size
         for i in range(batch_size):
             converted_box_data = self.prepare_data(i, forward_result)
@@ -925,8 +940,13 @@ class Yolo(BasicNetwork):
             #loss
             ground_truth_boxes = batch_boxes[i]
             ground_truth_label = batch_labels[i]
-            loss_i = self.get_loss(converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord=lambda_coord, lambda_noobj=lambda_noobj)
-            total_loss += loss_i
+            total_loss_i, part_1_i, part_2_i, part_3_i, part_4_i, part_5_i = self.get_loss(converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord=lambda_coord, lambda_noobj=lambda_noobj)
+            total_loss += total_loss_i
+            part_1 += part_1_i
+            part_2 += part_2_i
+            part_3 += part_3_i
+            part_4 += part_4_i
+            part_5 += part_5_i
             #predictions
             predictions_i = self.get_class_prediction(filtered_converted_box_data, converted_box_data)
             predictions[i] = predictions_i
@@ -934,7 +954,7 @@ class Yolo(BasicNetwork):
             list_filtered_converted_box_data[i] = None   
             if filtered_converted_box_data.shape[0] > 0:       
                 list_filtered_converted_box_data[i] = filtered_converted_box_data
-        return total_loss, predictions, list_filtered_converted_box_data
+        return total_loss, part_1, part_2, part_3, part_4, part_5, predictions, list_filtered_converted_box_data
         
     def get_loss(self, converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord = 5, lambda_noobj = 0.5):
         """
@@ -974,7 +994,7 @@ class Yolo(BasicNetwork):
                     classification_errors = T.square(ground_truth_label - class_probability_map) 
                     part_5 = T.sum(classification_errors)  
 
-            return part_4 + part_5
+            return part_4 + part_5, 0, 0, 0, part_4, part_5
 
         #extract data
         responsible_indices, responsible_indices_1, responsible_indices_any_1, responsible_indices_noobj_1 = self.get_responsible_indices(converted_box_data, ground_truth_boxes)
@@ -1054,7 +1074,7 @@ class Yolo(BasicNetwork):
 
         #combine parts 
         total_loss = part_1 + part_2 + part_3 + part_4 + part_5
-        return total_loss
+        return total_loss, part_1, part_2, part_3, part_4, part_5
 
     def get_class_prediction(self, filtered_converted_box_data, converted_box_data):
         """

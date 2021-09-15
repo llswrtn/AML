@@ -200,15 +200,20 @@ def test_loss(device, yolo, data_wrapper_images):
     print("batch_labels.shape", batch_labels.shape)
     forward_result = yolo(batch_images)
     #call loss function for batch
-    loss = yolo.get_batch_loss(forward_result, batch_boxes, batch_labels)
+    total_loss, part_1, part_2, part_3, part_4, part_5 = yolo.get_batch_loss(forward_result, batch_boxes, batch_labels)
     #call prediction function for batch
     predictions = yolo.get_batch_class_predictions(forward_result)
     print("predictions", predictions)
     print("batch_labels", batch_labels)
 
     print("##########")
-    total_loss, predictions, list_filtered_converted_box_data = yolo.get_batch_loss_and_class_predictions_and_boxes(forward_result, batch_boxes, batch_labels)
+    total_loss, part_1, part_2, part_3, part_4, part_5, predictions, list_filtered_converted_box_data = yolo.get_batch_loss_and_class_predictions_and_boxes(forward_result, batch_boxes, batch_labels)
     print("total_loss", total_loss)
+    print("part_1", part_1)
+    print("part_2", part_2)
+    print("part_3", part_3)
+    print("part_4", part_4)
+    print("part_5", part_5)
     print("predictions", predictions)
     print("list_filtered_converted_box_data", list_filtered_converted_box_data)
 
@@ -260,7 +265,7 @@ def test_epoch_logger():
 def run_tests(device, data_wrapper_images):
     print("running tests...")
     test_epoch_logger()
-    return
+    #return
     test_data(data_wrapper_images, device)
     data_wrapper_images.test_get_image_path()
     #sys.exit(0)
