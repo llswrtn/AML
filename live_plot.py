@@ -17,8 +17,6 @@ def load():
 
     return epoch_logger_train, epoch_logger_validate
 
-
-
 def update_plot(epoch_logger_train, epoch_logger_validate, old_epoch_logger_train, old_epoch_logger_validate, fig, axs):
     #check if data changed
     if old_epoch_logger_train != None and old_epoch_logger_validate != None:
@@ -65,7 +63,7 @@ def update_plot(epoch_logger_train, epoch_logger_validate, old_epoch_logger_trai
     plt.tight_layout()
 
 if __name__ == "__main__": 
-    print("hello world")
+    print("starting live plot")
     old_epoch_logger_train = None
     old_epoch_logger_validate = None
 

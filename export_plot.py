@@ -17,16 +17,11 @@ def load():
 
     return epoch_logger_train, epoch_logger_validate
 
-
-
-def export_plot(epoch_logger_train, epoch_logger_validate, fig, axs):
+def export_plot(epoch_logger_train, epoch_logger_validate):
     print("export plot, epoch:", epoch_logger_train.epoch_index, ", ", epoch_logger_validate.epoch_index)
     epoch_logger_train.generate_lists()
     epoch_logger_validate.generate_lists()
-    
-    for ax in fig.axes:
-        ax.cla()
-    
+        
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.set(title="total loss", xlabel="epoch", ylabel="total loss")
@@ -84,12 +79,6 @@ def export_plot(epoch_logger_train, epoch_logger_validate, fig, axs):
     plt.tight_layout()
 
 if __name__ == "__main__": 
-    print("hello world")
-
-    plt.ion()
-    plt.show()
-    fig, axs = plt.subplots(2, 3)
-    plt.tight_layout()
-
+    print("exporting plots")
     epoch_logger_train, epoch_logger_validate = load()
-    export_plot(epoch_logger_train, epoch_logger_validate, fig, axs)
+    export_plot(epoch_logger_train, epoch_logger_validate)
