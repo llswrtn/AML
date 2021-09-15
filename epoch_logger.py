@@ -62,9 +62,9 @@ class EpochLogger():
         self.list_l4 = []
         self.list_l5 = []
         for i in range(self.epoch_index + 1):        
-            self.list_total_loss.append(self.list_epoch_data[i].total_loss)
-            self.list_l1.append(self.list_epoch_data[i].l1)
-            self.list_l2.append(self.list_epoch_data[i].l2)
-            self.list_l3.append(self.list_epoch_data[i].l3)
-            self.list_l4.append(self.list_epoch_data[i].l4)
-            self.list_l5.append(self.list_epoch_data[i].l5)
+            self.list_total_loss.append(self.list_epoch_data[i].total_loss / self.num_images)
+            self.list_l1.append(self.list_epoch_data[i].l1 / self.num_images)
+            self.list_l2.append(self.list_epoch_data[i].l2 / self.num_images)
+            self.list_l3.append(self.list_epoch_data[i].l3 / self.num_images)
+            self.list_l4.append(self.list_epoch_data[i].l4 / self.num_images)
+            self.list_l5.append(self.list_epoch_data[i].l5 / self.num_images)
