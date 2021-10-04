@@ -1,7 +1,7 @@
 from dataset import ImageLevelSiimCovid19Dataset
 import utils 
 
-
+import argparse
 import cv2
 import logging
 import matplotlib.pyplot as plt
@@ -49,7 +49,7 @@ CLEAN_TRAIN_PATH = '/media/luisa/Volume/AML/train_image_level_clean_paths.csv'
 #CLEAN_TRAIN_PATH = '/media/luisa/Volume/AML/train_image_level_clean_paths_NOTNA.csv'
 
 
-m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0_test"
+m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_resnet50_fpn_10_epochs_240_v0_continue"
 indices_name = "test_set_fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.csv"
 model_name = "fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.pth"
 indices_name = "test_set_fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.csv"
@@ -66,7 +66,7 @@ MIN_IOU = 0.5
 def collate_fn(batch):
     return tuple(zip(*batch))
 
-class Averager:
+class Loss:
     def __init__(self):
         self.current_total = 0.0
         self.iterations = 0.0
@@ -86,7 +86,21 @@ class Averager:
         self.current_total = 0.0
         self.iterations = 0.0   
     
+    
+    
 if __name__ == "__main__":   
+	parser = argparse.ArgumentParser()
+	#parser.add_argument('--input', required=True, help="The folder where the serialized data is stored")
+	parser.add_argument('--load', type=str, help="path where model is stored")
+	args = parser.parse_args()
+
+	sequences_path = config.input
+	num_sequences = str(len(os.listdir(sequences_path)))
+
+	print("Save an innocent training process from certain death!")
+	print("(Casual reminder to myself that I need to ""sudo swapoff -a"")")
+	y_key = input ("press [y] to continue \n")
+	
 	os.mkdir(m_save_path)
 	os.mkdir(os.path.join(m_save_path, 'model'))
 	
@@ -143,7 +157,15 @@ if __name__ == "__main__":
 
 	#TODO: option to load model from path given in arg parser
 	model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, max_size =IMG_MAX_SIZE )
+	
+	if args.load:
+		print("loading model to continue training")
+		path_to_load_from = args.load
+		model = torch.load(path_to_load_from)	
+	
+	
 	model.rpn.min_size = 0.0 #needed to prevent NaN loss!!!
+
 	model.to(device)
 
 	# SGD optimizer 
@@ -156,7 +178,7 @@ if __name__ == "__main__":
 
 	
 	num_epochs = NUM_EPOCHS
-	loss_hist = Averager()
+	loss_hist = Loss()
 	itr = 1
 
 	#loss_logger = dict()
