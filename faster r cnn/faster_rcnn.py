@@ -41,7 +41,7 @@ from typing import List, Tuple, Dict, Optional, Any
 
 #number of training epochs
 NUM_EPOCHS = 100
-BATCH_SIZE = 1
+BATCH_SIZE = 8
 
 #max size for resizing of input images
 #TODO: experiment with diff max_size
@@ -59,11 +59,11 @@ RESIZED_TRAIN_PATH = '/media/luisa/Volume/AML/resized_train_image_level_clean_pa
 RESIZED_ROOT = '/media/luisa/Volume/AML/siim-covid19-detection/resized480'
 
 
-m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_mobilenet_240_100_epochs_new_anchor"
-indices_name = "test_set_fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.csv"
-model_name = "fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.pth"
-indices_name = "test_set_fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.csv"
-model_name = "fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.pth"
+m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_mobilenetV3_240_100_epochs_new_anchor"
+indices_name = "test_set_fasterrcnn_mobilenetV3_240_100_epochs_v0.csv"
+model_name = "fasterrcnn_mobilenet_240_100_epochs_v0.pth"
+indices_name = "test_set_fasterrcnn_fasterrcnn_mobilenet_240_100_epochs_v0.csv"
+model_name = "fasterrcnn_fasterrcnn_mobilenetV3_240_100_epochs_v0.pth"
 
 #classes for classification (not implemented yet)
 CLASSES = ['Negative for Pneumonia',' Typical Appearance', 'Indeterminate Appearance', 'Atypical Appearance']
@@ -108,20 +108,10 @@ if __name__ == "__main__":
 	print("(Casual reminder to myself that I need to ""sudo swapoff -a"")")
 	y_key = input ("press [y] to continue \n")
 	
-	os.mkdir(m_save_path)
-	os.mkdir(os.path.join(m_save_path, 'model'))
+
 	
-	model_save_name = os.path.join(m_save_path, 'model', model_name)
-	indices_save_name = os.path.join(m_save_path, indices_name)	
+
 	
-	# logger	
-	logger = logging.getLogger('faster_rcnn_loss')
-	logger.setLevel(logging.INFO)
-	handler = logging.FileHandler(os.path.join(m_save_path, 'faster_rcnn_loss.log'))
-	handler.setLevel(logging.INFO)
-	formatter = logging.Formatter('%(asctime)s [%(name)s] %(levelname)s: %(message)s')
-	handler.setFormatter(formatter)
-	logger.addHandler(handler)
 
 
 
@@ -148,8 +138,7 @@ if __name__ == "__main__":
 	indices_test = indices[4828:]
 	indices_train =  indices[:4828]
 
-	indices_test_df = pd.DataFrame(indices_test)
-	indices_test_df.to_csv(indices_save_name)
+
 
 	# train on 4828 images, keep remaining 1208 for test set, that's about an 80/20 split
 	dataset = torch.utils.data.Subset(dataset, indices[:4828])
@@ -164,9 +153,10 @@ if __name__ == "__main__":
 	
 	# The model
 	
-	backbone = torchvision.models.mobilenet_v2(pretrained=True).features
+	backbone = torchvision.models.mobilenet_v3_large(pretrained=True).features
 
-	backbone.out_channels = 1280
+	#backbone.out_channels = 1280
+	backbone.out_channels = 960
 	
 	#scales and ratios found by k means
 	#        sizes=((128, 256, 512),),
@@ -236,18 +226,27 @@ if __name__ == "__main__":
 
 	# SGD optimizer 
 	params = [p for p in model.parameters() if p.requires_grad]
-	#optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.01)	
 	
-	#lower weight_decay and higher lr causes NaN losses
-	optimizer = torch.optim.SGD(params, lr=1e-8, momentum=0.9, weight_decay=0.05)
-
-	# learning rate scheduler
 	
-	#lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+	
+	
+	# learning rate schedule
+	
+	optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.01)	
+	lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 	#lr_scheduler = None
+	
+	'''	
+	#Needed for ResNet50, lower weight_decay and higher lr causes NaN losses
+	#optimizer = torch.optim.SGD(params, lr=1e-8, momentum=0.9, weight_decay=0.05)
 	
 	#reduce lr only once a plateau is reached
 	lr_scheduler =  torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+	'''
+r
+	
+
+
 
 
 	
@@ -256,6 +255,24 @@ if __name__ == "__main__":
 	itr = 1
 
 	#loss_logger = dict()
+	
+	
+	os.mkdir(m_save_path)
+	os.mkdir(os.path.join(m_save_path, 'model'))
+	
+	model_save_name = os.path.join(m_save_path, 'model', model_name)
+	indices_save_name = os.path.join(m_save_path, indices_name)	
+	indices_test_df = pd.DataFrame(indices_test)
+	indices_test_df.to_csv(indices_save_name)
+	
+	# logger	
+	logger = logging.getLogger('faster_rcnn_loss')
+	logger.setLevel(logging.INFO)
+	handler = logging.FileHandler(os.path.join(m_save_path, 'faster_rcnn_loss.log'))
+	handler.setLevel(logging.INFO)
+	formatter = logging.Formatter('%(asctime)s [%(name)s] %(levelname)s: %(message)s')
+	handler.setFormatter(formatter)
+	logger.addHandler(handler)
 
 
 	torch.save(model, model_save_name)
@@ -294,7 +311,8 @@ if __name__ == "__main__":
 			    print(f"Iteration #{itr} loss: {loss_value}")
 			itr += 1
 			if lr_scheduler is not None:
-			    if epoch > 8:
+			    # 3 warmup epochs
+			    if epoch > 2:
 			        lr_scheduler.step(loss_value)
 
 		print(f"Epoch #{epoch} loss: {loss_hist.value}")  
