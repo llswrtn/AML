@@ -37,7 +37,8 @@ from typing import List, Tuple, Dict, Optional, Any
 
 
 #number of training epochs
-NUM_EPOCHS = 30
+NUM_EPOCHS = 100
+BATCH_SIZE = 4
 
 #max size for resizing of input images
 #TODO: experiment with diff max_size
@@ -55,7 +56,7 @@ RESIZED_TRAIN_PATH = '/media/luisa/Volume/AML/resized_train_image_level_clean_pa
 RESIZED_ROOT = '/media/luisa/Volume/AML/siim-covid19-detection/resized480'
 
 
-m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_resnet50_fpn_100_epochs_240_v0"
+m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_resnet50_fpn_240_100_epochs_v0"
 indices_name = "test_set_fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.csv"
 model_name = "fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.pth"
 indices_name = "test_set_fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.csv"
@@ -153,7 +154,7 @@ if __name__ == "__main__":
 	#dataset_test = torch.utils.data.Subset(dataset_test, indices[4828:])
 
 	# define training and validation data loaders
-	data_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True, num_workers=NUM_WORKERS, collate_fn=collate_fn)
+	data_loader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, collate_fn=collate_fn)
 
 	#data_loader_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=NUM_WORKERS, collate_fn=collate_fn)
 
@@ -200,6 +201,8 @@ if __name__ == "__main__":
 	# SGD optimizer 
 	params = [p for p in model.parameters() if p.requires_grad]
 	#optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.01)	
+	
+	#lower weight_decay and higher lr causes NaN losses
 	optimizer = torch.optim.SGD(params, lr=1e-8, momentum=0.9, weight_decay=0.05)
 
 	# learning rate scheduler
