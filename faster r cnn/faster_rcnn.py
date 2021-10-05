@@ -39,9 +39,9 @@ from typing import List, Tuple, Dict, Optional, Any
 NUM_EPOCHS = 30
 #max size for resizing of input images
 #TODO: experiment with diff max_size
-IMG_MAX_SIZE = 480
+IMG_MAX_SIZE = 240
 #number of workers for dataloader (set back to zero if keeps getting killed)
-NUM_WORKERS = 1
+NUM_WORKERS = 4
 
 ROOT =  '/media/luisa/Volume/AML/siim-covid19-detection'
 CLEAN_TRAIN_PATH = '/media/luisa/Volume/AML/train_image_level_clean_paths.csv'
@@ -49,7 +49,7 @@ CLEAN_TRAIN_PATH = '/media/luisa/Volume/AML/train_image_level_clean_paths.csv'
 #CLEAN_TRAIN_PATH = '/media/luisa/Volume/AML/train_image_level_clean_paths_NOTNA.csv'
 
 
-m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_resnet50_fpn_10_epochs_240_v0_continue"
+m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_resnet50_fpn_10_epochs_240_v0_test_workers"
 indices_name = "test_set_fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.csv"
 model_name = "fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.pth"
 indices_name = "test_set_fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.csv"
@@ -90,12 +90,9 @@ class Loss:
     
 if __name__ == "__main__":   
 	parser = argparse.ArgumentParser()
-	#parser.add_argument('--input', required=True, help="The folder where the serialized data is stored")
 	parser.add_argument('--load', type=str, help="path where model is stored")
 	args = parser.parse_args()
 
-	sequences_path = config.input
-	num_sequences = str(len(os.listdir(sequences_path)))
 
 	print("Save an innocent training process from certain death!")
 	print("(Casual reminder to myself that I need to ""sudo swapoff -a"")")
@@ -188,7 +185,7 @@ if __name__ == "__main__":
 
 	print("training started with " + str(NUM_WORKERS) + " workers")
 	print()	
-	logger.info('training started. images max_size: %s' str(IMG_MAX_SIZE))
+	logger.info('training started. images max_size: %s', str(IMG_MAX_SIZE))
 	
 	for epoch in range(num_epochs):
 		loss_hist.reset()
