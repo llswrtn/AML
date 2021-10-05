@@ -37,9 +37,11 @@ from typing import List, Tuple, Dict, Optional, Any
 
 #number of training epochs
 NUM_EPOCHS = 30
+
 #max size for resizing of input images
 #TODO: experiment with diff max_size
 IMG_MAX_SIZE = 240
+
 #number of workers for dataloader (set back to zero if keeps getting killed)
 NUM_WORKERS = 4
 
@@ -167,10 +169,16 @@ if __name__ == "__main__":
 
 	# SGD optimizer 
 	params = [p for p in model.parameters() if p.requires_grad]
+	#optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.01)	
 	optimizer = torch.optim.SGD(params, lr=1e-8, momentum=0.9, weight_decay=0.05)
-	# and a learning rate scheduler
+
+	# learning rate scheduler
+	
 	#lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
-	lr_scheduler = None
+	#lr_scheduler = None
+	
+	#reduce lr only once a plateau is reached
+	lr_scheduler =  torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
 
 	
@@ -217,17 +225,13 @@ if __name__ == "__main__":
 			    print(f"Iteration #{itr} loss: {loss_value}")
 			itr += 1
 			if lr_scheduler is not None:
-			    lr_scheduler.step()
+			    lr_scheduler.step(loss_value)
 
 		print(f"Epoch #{epoch} loss: {loss_hist.value}")  
 		torch.save(model, model_save_name)
 	    
-		#TODO: add eval after each episode
-		#evaluation
-	    
 
-
-	    
+	   	    
 
 	print()
 	print("Training of " + str(num_epochs)+ " completed!")
