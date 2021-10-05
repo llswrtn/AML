@@ -1,8 +1,7 @@
 from dataset import ImageLevelSiimCovid19Dataset
 from dataset import ResizedImageLevelSiimCovid19Dataset
-from torchvision.models.detection import FasterRCNN
-from torchvision.models.detection.rpn import AnchorGenerator
 
+import evaluate
 import utils 
 
 import argparse
@@ -17,22 +16,16 @@ import progressbar
 import pylibjpeg
 
 import torch
-#import torch.nn as nn
-#import torch.nn.functional as F
-
-
 import torch.optim as optim
-
 import torchvision
-#import torchvision.transforms as transforms
+
 
 #from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.rpn import AnchorGenerator
 
-#from torchvision.transforms import transforms as Tf
-#from torchvision.transforms import functional as F
+
 from typing import List, Tuple, Dict, Optional, Any
 
 
@@ -142,13 +135,12 @@ if __name__ == "__main__":
 
 	# train on 4828 images, keep remaining 1208 for test set, that's about an 80/20 split
 	dataset = torch.utils.data.Subset(dataset, indices[:4828])
-	#dataset = torch.utils.data.Subset(dataset, indices[:500])
-	#dataset_test = torch.utils.data.Subset(dataset_test, indices[4828:])
+	dataset_test = torch.utils.data.Subset(dataset_test, indices[4828:])
 
-	# define training and validation data loaders
+	# training and validation data loaders
 	data_loader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, collate_fn=collate_fn)
 
-	#data_loader_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=NUM_WORKERS, collate_fn=collate_fn)
+	data_loader_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=NUM_WORKERS, collate_fn=collate_fn)
 
 	
 	# The model
@@ -315,6 +307,11 @@ if __name__ == "__main__":
 			        lr_scheduler.step(loss_value)
 
 		print(f"Epoch #{epoch} loss: {loss_hist.value}")  
+		
+		#evaluate
+		tp, fp, all_tp, all_fp = generate_tp_fp(data_loader_test)
+		ap, mrec, mprec = ap_rec_prec (tp, fp)
+		
 		torch.save(model, model_save_name)
 	    
 
