@@ -34,10 +34,10 @@ from typing import List, Tuple, Dict, Optional, Any
 
 #number of training epochs
 NUM_EPOCHS = 100
-BATCH_SIZE = 4
+BATCH_SIZE = 2
 
 #max size for resizing of input images
-#TODO: experiment with diff max_size
+
 IMG_MAX_SIZE = 240
 
 #number of workers for dataloader (set back to zero if keeps getting killed)
@@ -52,11 +52,13 @@ RESIZED_TRAIN_PATH = '/media/luisa/Volume/AML/resized_train_image_level_clean_pa
 RESIZED_ROOT = '/media/luisa/Volume/AML/siim-covid19-detection/resized480'
 
 
-m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_mobilenetV3_240_100_epochs_new_anchor"
+m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_mobilenetV3_240_v1"
 indices_name = "test_set_fasterrcnn_mobilenetV3_240_100_epochs_v0.csv"
 model_name = "fasterrcnn_mobilenet_240_100_epochs_v0.pth"
 indices_name = "test_set_fasterrcnn_fasterrcnn_mobilenet_240_100_epochs_v0.csv"
 model_name = "fasterrcnn_fasterrcnn_mobilenetV3_240_100_epochs_v0.pth"
+
+
 
 #classes for classification (not implemented yet)
 CLASSES = ['Negative for Pneumonia',' Typical Appearance', 'Indeterminate Appearance', 'Atypical Appearance']
@@ -119,7 +121,7 @@ if __name__ == "__main__":
 	#dataset = ImageLevelSiimCovid19Dataset(ROOT, utils.get_transform(train=True), CLEAN_TRAIN_PATH)
 	dataset = ResizedImageLevelSiimCovid19Dataset(RESIZED_ROOT, utils.get_transform(train=True), RESIZED_TRAIN_PATH)
 	
-	#dataset_test = ImageLevelSiimCovid19Dataset(ROOT, utils.get_transform(train=False))
+	#dataset_test = ImageLevelSiimCovid19Dataset(RESIZED_ROOT, utils.get_transform(train=False), RESIZED_TRAIN_PATH)
 	
 	#TODO: Option to load training indices from somewhere
 
@@ -134,11 +136,13 @@ if __name__ == "__main__":
 
 
 	# train on 4828 images, keep remaining 1208 for test set, that's about an 80/20 split
-	dataset = torch.utils.data.Subset(dataset, indices[:4828])
-	dataset_test = torch.utils.data.Subset(dataset_test, indices[4828:])
+	#dataset = torch.utils.data.Subset(dataset, indices[:4828])
+	dataset_train = torch.utils.data.Subset(dataset, indices[:100])
+	
+	dataset_test = torch.utils.data.Subset(dataset, indices[4828:])
 
 	# training and validation data loaders
-	data_loader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, collate_fn=collate_fn)
+	data_loader = torch.utils.data.DataLoader(dataset_train, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, collate_fn=collate_fn)
 
 	data_loader_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=NUM_WORKERS, collate_fn=collate_fn)
 
@@ -244,12 +248,16 @@ if __name__ == "__main__":
 	num_epochs = NUM_EPOCHS
 	loss_hist = Loss()
 	itr = 1
+	ep = 0
 
 	#loss_logger = dict()
 	
 	
 	os.mkdir(m_save_path)
 	os.mkdir(os.path.join(m_save_path, 'model'))
+	os.mkdir(os.path.join(m_save_path, 'rec')
+	os.mkdir(os.path.join(m_save_path, 'prec')
+
 	
 	model_save_name = os.path.join(m_save_path, 'model', model_name)
 	indices_save_name = os.path.join(m_save_path, indices_name)	
@@ -304,15 +312,25 @@ if __name__ == "__main__":
 			if lr_scheduler is not None:
 			    # 3 warmup epochs
 			    if epoch > 2:
-			        lr_scheduler.step(loss_value)
+			        lr_scheduler.step()
 
 		print(f"Epoch #{epoch} loss: {loss_hist.value}")  
-		
-		#evaluate
-		tp, fp, all_tp, all_fp = generate_tp_fp(data_loader_test)
-		ap, mrec, mprec = ap_rec_prec (tp, fp)
-		
 		torch.save(model, model_save_name)
+		ep +=1
+		
+		if ep % 1 == 0:
+		    #evaluate
+		    
+		
+		    model.eval()
+		    tp, fp, all_tp, all_fp = evaluate.generate_tp_fp(data_loader_test, model)
+		    ap, mrec, mprec = evaluate.ap_rec_prec (tp, fp)
+		    prec_name = "prec" + str(ep) + ".npy"
+		    rec_name = "rec" + str(ep) ".npy"
+		    np.save(os.path.join(m_save_path, 'rec', rec_name), mrec)
+		    np.save(os.path.join(m_save_path, 'prec', prec_name), mprec)
+		    		
+		    model.train()
 	    
 
 	   	    

@@ -3,6 +3,7 @@
 
 import numpy as np
 import pandas as pd
+import torch
 
 # usage: 
 # tp, fp, all_tp, all_fp = generate_tp_fp(data_loader_test)
@@ -20,16 +21,17 @@ def ap_rec_prec (tp, fp):
 	prec = tp_cumsum /(fp_cumsum + tp_cumsum)
 
 	
-	AP, mrec, mprec = voc_ap(rec[:], prec[:])
+	ap, mrec, mprec = voc_ap(rec[:], prec[:])
 	
-	class_name = 'opacity'
+	class_name = ' opacity'
 
 	text = "{0:.2f}%".format(ap*100) + class_name + " AP "
 	print(text)
 	return ap, mrec, mprec
 
 
-def generate_tp_fp (test_dataloader):
+def generate_tp_fp (test_dataloader, model, MIN_IOU = 0.5):
+    device = torch.device("cuda")
     tp = [] #append 1 and the score, later delete score
     fp = [] #append 1 and the score, later delete score
     scores = []
@@ -59,8 +61,6 @@ def generate_tp_fp (test_dataloader):
           #  pred_box = all_preds_df.iloc[i]['pred_boxes']
 
         #count true positives:
-        # set temp_max_iou = -1
-        # set temp_gt_match = -1
 
         #array to flag used gt boxes
         used = [False]*len(gt_boxes)
@@ -128,6 +128,7 @@ def generate_tp_fp (test_dataloader):
     fp_ = fp_.sort_values('scores',  ascending=False)
     fp_ = fp_['fp'].tolist()
     
+    print("TPs: " + str(all_tp)+ "   FPs: " + str(all_fp))
     return tp_, fp_, all_tp, all_fp
     
     
