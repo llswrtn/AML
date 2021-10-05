@@ -38,7 +38,7 @@ from typing import List, Tuple, Dict, Optional, Any
 
 #number of training epochs
 NUM_EPOCHS = 100
-BATCH_SIZE = 4
+BATCH_SIZE = 1
 
 #max size for resizing of input images
 #TODO: experiment with diff max_size
@@ -56,7 +56,7 @@ RESIZED_TRAIN_PATH = '/media/luisa/Volume/AML/resized_train_image_level_clean_pa
 RESIZED_ROOT = '/media/luisa/Volume/AML/siim-covid19-detection/resized480'
 
 
-m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_resnet50_fpn_240_100_epochs_v0"
+m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_resnet50_fpn_240_100_epochs_new_anchor"
 indices_name = "test_set_fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.csv"
 model_name = "fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.pth"
 indices_name = "test_set_fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.csv"
@@ -160,11 +160,21 @@ if __name__ == "__main__":
 
 	
 	# The model
+	
+	
+	#scales and ratios found by k means
+	
+	anchor_generator = AnchorGenerator(sizes=((32, 64, 80, 100),), aspect_ratios=((1, 1.5, 2),))
 	#model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, max_size =IMG_MAX_SIZE )
 	
 	#train on resized, no max size...max size 480 not possible
 	#box_detections_per_img (int): maximum number of detections per image, for all classes.
-	model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, box_detections_per_img = 8, max_size =IMG_MAX_SIZE )
+	model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, box_detections_per_img = 3, max_size =IMG_MAX_SIZE, rpn_anchor_generator=anchor_generator )
+	
+	# get number of input features for the classifier
+	in_features = model.roi_heads.box_predictor.cls_score.in_features
+	# replace the pre-trained head with a new one
+	model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 	
 	# aspect ratio common in this dataset. check sizes after resizing!
 	
@@ -185,8 +195,7 @@ if __name__ == "__main__":
 		sizes (Tuple[Tuple[int]]):
 		aspect_ratios (Tuple[Tuple[float]]):''
 	'''
-	#TODO: k-means on resized images!!!
-	#anchor_generator = AnchorGenerator(sizes=((32, 64, 128, 256, 512),), aspect_ratios=((1/0.6, 1/0.8, 1),))
+
 	
 	if args.load:
 		print("loading model to continue training")
