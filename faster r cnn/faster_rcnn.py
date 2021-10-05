@@ -41,7 +41,7 @@ from typing import List, Tuple, Dict, Optional, Any
 
 #number of training epochs
 NUM_EPOCHS = 100
-BATCH_SIZE = 8
+BATCH_SIZE = 4
 
 #max size for resizing of input images
 #TODO: experiment with diff max_size
@@ -230,7 +230,7 @@ if __name__ == "__main__":
 	
 	
 	
-	# learning rate schedule
+	# learning rate scheduler
 	
 	optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.01)	
 	lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
@@ -243,8 +243,7 @@ if __name__ == "__main__":
 	#reduce lr only once a plateau is reached
 	lr_scheduler =  torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 	'''
-r
-	
+
 
 
 
@@ -305,9 +304,9 @@ r
 			    iteration_name = 'iteration ' + str(itr)
 			    loss_log_msg = iteration_name + ': ' + str(loss_dict)
 			    logger.info('loss %s', loss_log_msg)
-			    #loss_logger[iteration_name] = loss_dict
+
 			    
-			if itr % 500 == 0:
+			if itr % 50 == 0:
 			    print(f"Iteration #{itr} loss: {loss_value}")
 			itr += 1
 			if lr_scheduler is not None:
