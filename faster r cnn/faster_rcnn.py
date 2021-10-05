@@ -1,4 +1,5 @@
 from dataset import ImageLevelSiimCovid19Dataset
+from dataset import ResizedImageLevelSiimCovid19Dataset
 import utils 
 
 import argparse
@@ -50,8 +51,11 @@ CLEAN_TRAIN_PATH = '/media/luisa/Volume/AML/train_image_level_clean_paths.csv'
 #alternative path with only images that contain at least on bounding box
 #CLEAN_TRAIN_PATH = '/media/luisa/Volume/AML/train_image_level_clean_paths_NOTNA.csv'
 
+RESIZED_TRAIN_PATH = '/media/luisa/Volume/AML/resized_train_image_level_clean_paths.csv'
+RESIZED_ROOT = '/media/luisa/Volume/AML/siim-covid19-detection/resized480'
 
-m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_resnet50_fpn_10_epochs_240_v0_test_workers"
+
+m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_resnet50_fpn_100_epochs_240_v0"
 indices_name = "test_set_fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.csv"
 model_name = "fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.pth"
 indices_name = "test_set_fasterrcnn_resnet50_fpn_10_epochs_diffNoBox_v0.csv"
@@ -125,7 +129,9 @@ if __name__ == "__main__":
 	num_classes = 2
 
 
-	dataset = ImageLevelSiimCovid19Dataset(ROOT, utils.get_transform(train=True), CLEAN_TRAIN_PATH)
+	#dataset = ImageLevelSiimCovid19Dataset(ROOT, utils.get_transform(train=True), CLEAN_TRAIN_PATH)
+	dataset = ResizedImageLevelSiimCovid19Dataset(RESIZED_ROOT, utils.get_transform(train=True), RESIZED_TRAIN_PATH)
+	
 	#dataset_test = ImageLevelSiimCovid19Dataset(ROOT, utils.get_transform(train=False))
 	
 	#TODO: Option to load training indices from somewhere
@@ -151,11 +157,35 @@ if __name__ == "__main__":
 
 	#data_loader_test = torch.utils.data.DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=NUM_WORKERS, collate_fn=collate_fn)
 
-	# get the model using our helper function
-	#model = get_model_instance_segmentation(num_classes) #mask rcnn instance segmentation
+	
+	# The model
+	#model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, max_size =IMG_MAX_SIZE )
+	
+	#train on resized, no max size...max size 480 not possible
+	#box_detections_per_img (int): maximum number of detections per image, for all classes.
+	model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, box_detections_per_img = 8, max_size =IMG_MAX_SIZE )
+	
+	# aspect ratio common in this dataset. check sizes after resizing!
+	
+	'''
+	From AnchorGenerator source code:
+		    ''The module support computing anchors at multiple sizes and aspect ratios
+	    per feature map. This module assumes aspect ratio = height / width for
+	    each anchor.
 
-	#TODO: option to load model from path given in arg parser
-	model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, max_size =IMG_MAX_SIZE )
+	    sizes and aspect_ratios should have the same number of elements, and it should
+	    correspond to the number of feature maps.
+
+	    sizes[i] and aspect_ratios[i] can have an arbitrary number of elements,
+	    and AnchorGenerator will output a set of sizes[i] * aspect_ratios[i] anchors
+	    per spatial location for feature map i.
+
+	    Args:
+		sizes (Tuple[Tuple[int]]):
+		aspect_ratios (Tuple[Tuple[float]]):''
+	'''
+	#TODO: k-means on resized images!!!
+	#anchor_generator = AnchorGenerator(sizes=((32, 64, 128, 256, 512),), aspect_ratios=((1/0.6, 1/0.8, 1),))
 	
 	if args.load:
 		print("loading model to continue training")
@@ -225,7 +255,8 @@ if __name__ == "__main__":
 			    print(f"Iteration #{itr} loss: {loss_value}")
 			itr += 1
 			if lr_scheduler is not None:
-			    lr_scheduler.step(loss_value)
+			    if epoch > 8:
+			        lr_scheduler.step(loss_value)
 
 		print(f"Epoch #{epoch} loss: {loss_hist.value}")  
 		torch.save(model, model_save_name)
