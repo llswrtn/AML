@@ -171,13 +171,28 @@ if __name__ == "__main__":
 	roi_pooler = torchvision.ops.MultiScaleRoIAlign(featmap_names=['0'],
                                                 output_size=7,
                                                 sampling_ratio=2)
-                                                
+        
+        
+        '''
+        
+        box_detections_per_img (int): maximum number of detections per image, for all classes.
+
+        rpn_nms_thresh (float): NMS threshold used for postprocessing the RPN proposals
+        default = 0.7
+
+        rpn_post_nms_top_n_train (int): number of proposals to keep after applying NMS during training
+        
+        rpn_post_nms_top_n_test (int): number of proposals to keep after applying NMS during testing
+        '''                                        
 	#model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, max_size =IMG_MAX_SIZE )
 	
 	model = FasterRCNN(backbone,
                    num_classes=2,
                    rpn_anchor_generator=anchor_generator,
-                   box_roi_pool=roi_pooler)
+                   box_roi_pool=roi_pooler, 
+                   rpn_nms_thresh = 0.3, 
+                   rpn_post_nms_top_n_train = 8, 
+                   box_detections_per_img = 8)
 	
 	
 	#train on resized, no max size...max size 480 not possible
