@@ -38,7 +38,7 @@ BATCH_SIZE = 2
 
 #max size for resizing of input images
 
-IMG_MAX_SIZE = 240
+IMG_MAX_SIZE = 480
 
 #number of workers for dataloader (set back to zero if keeps getting killed)
 NUM_WORKERS = 4
@@ -136,9 +136,10 @@ if __name__ == "__main__":
 
 
 	# train on 4828 images, keep remaining 1208 for test set, that's about an 80/20 split
-	#dataset = torch.utils.data.Subset(dataset, indices[:4828])
-	dataset_train = torch.utils.data.Subset(dataset, indices[:100])
 	
+	#dataset_train = torch.utils.data.Subset(dataset, indices[:100]) #debug train set
+	
+	dataset_train = torch.utils.data.Subset(dataset, indices[:4828])
 	dataset_test = torch.utils.data.Subset(dataset, indices[4828:])
 
 	# training and validation data loaders
@@ -149,6 +150,7 @@ if __name__ == "__main__":
 	
 	# The model
 	
+	# load with pretrained weights
 	backbone = torchvision.models.mobilenet_v3_large(pretrained=True).features
 
 	#backbone.out_channels = 1280
@@ -171,19 +173,7 @@ if __name__ == "__main__":
 	roi_pooler = torchvision.ops.MultiScaleRoIAlign(featmap_names=['0'],
                                                 output_size=7,
                                                 sampling_ratio=2)
-        
-        
-        '''
-        
-        box_detections_per_img (int): maximum number of detections per image, for all classes.
-
-        rpn_nms_thresh (float): NMS threshold used for postprocessing the RPN proposals
-        default = 0.7
-
-        rpn_post_nms_top_n_train (int): number of proposals to keep after applying NMS during training
-        
-        rpn_post_nms_top_n_test (int): number of proposals to keep after applying NMS during testing
-        '''                                        
+ 
 	#model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, max_size =IMG_MAX_SIZE )
 	
 	model = FasterRCNN(backbone,
@@ -267,11 +257,11 @@ if __name__ == "__main__":
 
 	#loss_logger = dict()
 	
-	
+	# make dir to save model and metrics
 	os.mkdir(m_save_path)
 	os.mkdir(os.path.join(m_save_path, 'model'))
-	os.mkdir(os.path.join(m_save_path, 'rec')
-	os.mkdir(os.path.join(m_save_path, 'prec')
+	os.mkdir(os.path.join(m_save_path, 'rec'))
+	os.mkdir(os.path.join(m_save_path, 'prec'))
 
 	
 	model_save_name = os.path.join(m_save_path, 'model', model_name)
@@ -321,7 +311,7 @@ if __name__ == "__main__":
 			    logger.info('loss %s', loss_log_msg)
 
 			    
-			if itr % 50 == 0:
+			if itr % 250 == 0:
 			    print(f"Iteration #{itr} loss: {loss_value}")
 			itr += 1
 			if lr_scheduler is not None:
@@ -333,7 +323,7 @@ if __name__ == "__main__":
 		torch.save(model, model_save_name)
 		ep +=1
 		
-		if ep % 1 == 0:
+		if ep % 5 == 0:
 		    #evaluate
 		    
 		
@@ -341,7 +331,7 @@ if __name__ == "__main__":
 		    tp, fp, all_tp, all_fp = evaluate.generate_tp_fp(data_loader_test, model)
 		    ap, mrec, mprec = evaluate.ap_rec_prec (tp, fp)
 		    prec_name = "prec" + str(ep) + ".npy"
-		    rec_name = "rec" + str(ep) ".npy"
+		    rec_name = "rec" + str(ep) + ".npy"
 		    np.save(os.path.join(m_save_path, 'rec', rec_name), mrec)
 		    np.save(os.path.join(m_save_path, 'prec', prec_name), mprec)
 		    		
