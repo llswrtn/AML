@@ -33,12 +33,12 @@ from typing import List, Tuple, Dict, Optional, Any
 
 
 #number of training epochs
-NUM_EPOCHS = 100
-BATCH_SIZE = 2
+NUM_EPOCHS = 300
+BATCH_SIZE = 4
 
 #max size for resizing of input images
 
-IMG_MAX_SIZE = 480
+IMG_MAX_SIZE = 240
 
 #number of workers for dataloader (set back to zero if keeps getting killed)
 NUM_WORKERS = 4
@@ -52,7 +52,7 @@ RESIZED_TRAIN_PATH = '/media/luisa/Volume/AML/resized_train_image_level_clean_pa
 RESIZED_ROOT = '/media/luisa/Volume/AML/siim-covid19-detection/resized480'
 
 
-m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_mobilenetV3_240_v1"
+m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_mobilenetV2_240_300epochs_nms03both"
 indices_name = "test_set_fasterrcnn_mobilenetV3_240_100_epochs_v0.csv"
 model_name = "fasterrcnn_mobilenet_240_100_epochs_v0.pth"
 indices_name = "test_set_fasterrcnn_fasterrcnn_mobilenet_240_100_epochs_v0.csv"
@@ -151,10 +151,13 @@ if __name__ == "__main__":
 	# The model
 	
 	# load with pretrained weights
-	backbone = torchvision.models.mobilenet_v3_large(pretrained=True).features
-
-	#backbone.out_channels = 1280
-	backbone.out_channels = 960
+	
+	#backbone = torchvision.models.mobilenet_v3_large(pretrained=True).features
+        #backbone.out_channels = 960
+        
+	backbone = torchvision.models.mobilenet_v2(pretrained=True).features
+	backbone.out_channels = 1280
+	
 	
 	#scales and ratios found by k means
 	#        sizes=((128, 256, 512),),
@@ -169,20 +172,25 @@ if __name__ == "__main__":
             )
             
         '''    
-	anchor_generator = AnchorGenerator(sizes=((32, 64, 128),), aspect_ratios=((1.0, 1.5, 2.0),))
+	anchor_generator = AnchorGenerator(sizes=((32, 64, 128),), aspect_ratios=((0.8, 1.0, 1.5, 2.0),))
 	roi_pooler = torchvision.ops.MultiScaleRoIAlign(featmap_names=['0'],
                                                 output_size=7,
                                                 sampling_ratio=2)
  
 	#model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, max_size =IMG_MAX_SIZE )
 	
+	
+	#box_nms_thresh (float): NMS threshold for the prediction head. Used during inference
+	
 	model = FasterRCNN(backbone,
                    num_classes=2,
                    rpn_anchor_generator=anchor_generator,
                    box_roi_pool=roi_pooler, 
-                   rpn_nms_thresh = 0.3, 
-                   rpn_post_nms_top_n_train = 8, 
-                   box_detections_per_img = 8)
+                   box_nms_thresh = 0.3,
+                   #box_detections_per_img = 3, #disable this next time?
+                   #rpn_post_nms_top_n_train = 50,
+                   max_size =IMG_MAX_SIZE,
+                   rpn_nms_thresh = 0.3)
 	
 	
 	#train on resized, no max size...max size 480 not possible
@@ -226,14 +234,15 @@ if __name__ == "__main__":
 	model.to(device)
 
 	# SGD optimizer 
-	params = [p for p in model.parameters() if p.requires_grad]
+	params = [p for p in model.parameters() if p.requires_grad]	
+	#optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.01)	
 	
-	
+	#optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
+	optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.0005)	
 	
 	
 	# learning rate scheduler
 	
-	optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.01)	
 	lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 	#lr_scheduler = None
 	
@@ -287,6 +296,12 @@ if __name__ == "__main__":
 	
 	for epoch in range(num_epochs):
 		loss_hist.reset()
+		
+		if epoch == 0:
+			warmup_factor = 1. / 1000
+			warmup_iters = min(1000, len(data_loader) - 1)
+			lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
+		
 	    
 		for images, targets in data_loader:
 			images = list(image.to(device) for image in images)
@@ -315,8 +330,8 @@ if __name__ == "__main__":
 			    print(f"Iteration #{itr} loss: {loss_value}")
 			itr += 1
 			if lr_scheduler is not None:
-			    # 3 warmup epochs
-			    if epoch > 2:
+			    ## 3 warmup epochs
+			    #if epoch > 2:
 			        lr_scheduler.step()
 
 		print(f"Epoch #{epoch} loss: {loss_hist.value}")  
@@ -341,4 +356,4 @@ if __name__ == "__main__":
 	   	    
 
 	print()
-	print("Training of " + str(num_epochs)+ " completed!")
+	print("Training of " + str(num_epochs)+ " epochs completed!")
