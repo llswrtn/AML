@@ -54,11 +54,12 @@ class EpochLogger():
         print("l5", epoch_data.l5)
 
 
-    def store(self):
+    def store(self, prefix=""):
         """
         Store the current values.
         """
-        with open(f"{self.name}.pt", "wb") as file:
+        file_path = prefix+self.name+".pt"
+        with open(file_path, "wb") as file:
             pickle.dump(self, file)
 
     def generate_lists(self):

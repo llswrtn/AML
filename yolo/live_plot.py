@@ -6,7 +6,8 @@ from epoch_logger import *
 
 #NAME = "2021-10-05_V1" #CHANGE THIS
 #NAME = "2021-10-06_V2" #CHANGE THIS
-NAME = None
+#NAME = None
+NAME = "test"
 
 COLOR_TRAIN = "black"
 COLOR_VALIDATE = "green"

@@ -3,4 +3,5 @@ data_448x448/
 saved_output/
 output/
 results/
+plots/
 __pycache__/

@@ -73,16 +73,25 @@ class EpochLoggerAP():
         self.list_tp = []
         self.list_fp = []
         self.list_nd = []
+        self.list_fp_percentage = []
         self.list_predicted_class_0 = []
         self.list_predicted_class_1 = []
         self.list_predicted_class_2 = []
         self.list_predicted_class_3 = []
         self.list_predicted_correct = []
-        for i in range(self.epoch_index + 1):        
+        for i in range(self.epoch_index + 1):       
+            tp = self.list_epoch_data[i].tp / self.num_ground_truth_boxes 
+            fp = self.list_epoch_data[i].fp / self.num_ground_truth_boxes
+            nd = self.list_epoch_data[i].nd / self.num_ground_truth_boxes
             self.list_ap.append(self.list_epoch_data[i].ap)
-            self.list_tp.append(self.list_epoch_data[i].tp / self.num_ground_truth_boxes)
-            self.list_fp.append(self.list_epoch_data[i].fp / self.num_ground_truth_boxes)
-            self.list_nd.append(self.list_epoch_data[i].nd / self.num_ground_truth_boxes)
+            self.list_tp.append(tp)
+            self.list_fp.append(fp)
+            self.list_nd.append(nd)
+            print("tp,fp",tp, fp)
+            if nd != 0:
+                self.list_fp_percentage.append(fp / nd)
+            else:
+                self.list_fp_percentage.append(0)
 
             predicted_classes = np.sum(self.list_epoch_data[i].confusion_matrix, axis=1)
             correct_count = np.trace(self.list_epoch_data[i].confusion_matrix)

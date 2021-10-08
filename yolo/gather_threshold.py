@@ -23,9 +23,10 @@ from tqdm import tqdm
 from PIL import Image
 from ap import *
 
-prefix_results = "results/test/"
+prefix_results = "results/threshold/"
 prefix_output = "saved_output/2021-10-05_V1/"
 
+yolo_file_name = "saved_output/2021-10-05_V1/299.pt"
 #NAME = "2021-10-05_V1" #CHANGE THIS
 #NAME = "2021-10-06_V2" #CHANGE THIS
 #NAME = None
@@ -39,6 +40,7 @@ def run_gather_ap(device, data_wrapper_images, prefix_results, prefix_output):
     #
     ##############################################################################################################
 
+    num_thresholds = 11
     batch_size = 64
     continue_validation = False
 
@@ -60,19 +62,8 @@ def run_gather_ap(device, data_wrapper_images, prefix_results, prefix_output):
     #       INITIALIZE EPOCH LOGGER
     #
     ##############################################################################################################
-
-    epoch_logger_train = None
-    epoch_logger_validate = None
-    
-    with open(prefix_results+"epoch_logger_train.pt", "rb") as file:
-        epoch_logger_train = pickle.load(file)
-    
-    #with open(prefix_results+"epoch_logger_validate.pt", "rb") as file:
-    #    epoch_logger_validate = pickle.load(file)
-
-    epoch_logger_validate = EpochLogger(name="epoch_logger_validate", num_images=num_validation_images)
-        
-    epoch_logger_ap = EpochLoggerAP(name="epoch_logger_ap", num_images=num_validation_images)
+            
+    epoch_logger_threshold = EpochLoggerAP(name="epoch_logger_threshold", num_images=num_validation_images)
 
     ##############################################################################################################
     #
@@ -94,18 +85,16 @@ def run_gather_ap(device, data_wrapper_images, prefix_results, prefix_output):
     ##############################################################################################################
 
     T.autograd.set_detect_anomaly(True)
-    while epoch_logger_validate.epoch_index < epoch_logger_train.epoch_index: 
+    for i in range(num_thresholds): 
         #[ap, all_tp, all_fp]
-        run_epoch(epoch_logger_validate, epoch_logger_ap, batch_size, num_validation_batches, yolo, data_wrapper_images, device, prefix_output)
-
+        threshold = (i/(num_thresholds-1))
+        run_epoch(threshold, epoch_logger_threshold, batch_size, num_validation_batches, yolo, data_wrapper_images, device, prefix_output)
     
-def run_epoch(epoch_logger_validate, epoch_logger_ap, batch_size, num_batches, yolo, data_wrapper_images, device, prefix_output):
+def run_epoch(score_threshold, epoch_logger_threshold, batch_size, num_batches, yolo, data_wrapper_images, device, prefix_output):
     #start of a new epoch  
-    epoch_logger_validate.start_epoch()
-    epoch_logger_ap.start_epoch()
-    print(" start epoch index: ", epoch_logger_validate.epoch_index, ", ", epoch_logger_ap.epoch_index)
-    file_name = str(epoch_logger_ap.epoch_index) + ".pt"
-    yolo.load(path=prefix_output+file_name, device=device)
+    epoch_logger_threshold.start_epoch()
+    print(" start epoch index: ", epoch_logger_threshold.epoch_index, ", ", score_threshold)
+    yolo.load(path=yolo_file_name, device=device)
 
     yolo.eval()
 
@@ -121,9 +110,7 @@ def run_epoch(epoch_logger_validate, epoch_logger_ap, batch_size, num_batches, y
         #get the results of the yolo network
         forward_result = yolo(batch_images)
         #get everything in one go (loss, class prediction, and boxes)
-        total_loss, part_1, part_2, part_3, part_4, part_5, predictions, list_filtered_converted_box_data = yolo.get_batch_loss_and_class_predictions_and_boxes(forward_result, batch_boxes, batch_labels)
-
-        epoch_logger_validate.add_loss(total_loss,part_1,part_2,part_3,part_4,part_5)
+        total_loss, part_1, part_2, part_3, part_4, part_5, predictions, list_filtered_converted_box_data = yolo.get_batch_loss_and_class_predictions_and_boxes(forward_result, batch_boxes, batch_labels, score_threshold=score_threshold)
 
         #gather all predicted boxes by iterating over all images of the batch
         for i in range(batch_size):
@@ -149,17 +136,15 @@ def run_epoch(epoch_logger_validate, epoch_logger_ap, batch_size, num_batches, y
 
             predicted_label = T.argmax(predictions[i]).item()
             ground_truth_label = T.argmax(batch_labels[i]).item()
-            epoch_logger_ap.add_prediction(predicted_label, ground_truth_label)
+            epoch_logger_threshold.add_prediction(predicted_label, ground_truth_label)
     
     #at the end of the epoch, store results
     result = calculate_ap(all_gt_boxes, all_preds)
-    epoch_logger_ap.add_epoch_data(result[0], result[1], result[2], result[3])
-    epoch_logger_ap.num_ground_truth_boxes = result[4]
-    epoch_logger_ap.print_epoch()
-    epoch_logger_ap.store(prefix=prefix_results)
+    epoch_logger_threshold.add_epoch_data(result[0], result[1], result[2], result[3])
+    epoch_logger_threshold.num_ground_truth_boxes = result[4]
+    epoch_logger_threshold.print_epoch()
+    epoch_logger_threshold.store(prefix=prefix_results)
     
-    epoch_logger_validate.store(prefix=prefix_results)
-
 if __name__ == "__main__":  
     print("prefix_results:", prefix_results)
     print("prefix_output:", prefix_output)
