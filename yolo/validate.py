@@ -86,25 +86,80 @@ def run_validate(device, data_wrapper_images):
     ##############################################################################################################
 
     #T.autograd.set_detect_anomaly(True)
-    run_epoch(False, epoch_logger_validate, batch_size, num_validation_batches, yolo, optimizer, data_wrapper_images, device)
 
     yolo.eval()
 
-    T.set_grad_enabled(is_train)
+    T.set_grad_enabled(False)
 
+    all_preds = []
+    all_gt_boxes = []
     #loop over all batches
     for batch_index in tqdm(range(num_validation_batches)):
         #zero the gradient since we do not want to use the previous mini batch
         optimizer.zero_grad()
         #get the data of the current train batch
         batch_images, batch_boxes, batch_labels = data_wrapper_images.get_validation_batch(batch_index, batch_size, device) 
+        batch_indices = data_wrapper_images.get_validation_batch_indices(batch_index, batch_size)
         #get the results of the yolo network
         forward_result = yolo(batch_images)
         #get everything in one go (loss, class prediction, and boxes)
         total_loss, part_1, part_2, part_3, part_4, part_5, predictions, list_filtered_converted_box_data = yolo.get_batch_loss_and_class_predictions_and_boxes(forward_result, batch_boxes, batch_labels)
 
-        print(predictions)
-    
-    
+        #gather all predicted boxes by iterating over all images of the batch
+        for i in range(batch_size):
+            image_index = batch_indices[i]
+            filtered_converted_box_data = list_filtered_converted_box_data[i]
+            #we are interested in non empty box predictions
+            if not (filtered_converted_box_data is None):
+                #add every box of the prediction
+                for j in range(filtered_converted_box_data.shape[0]):
+                    box = filtered_converted_box_data[j]
+                    box_coords = box[:4].cpu().numpy()
+                    box_confidence = box[4].item()
+                    entry = [image_index, box_coords, box_confidence]
+                    all_preds.append(entry)
 
+            boxes = batch_boxes[i]
+            if not (boxes is None):
+                #add every box
+                for j in range(boxes.shape[0]):
+                    box = boxes[j].cpu().numpy()                    
+                    entry = [image_index, box, False]
+                    all_gt_boxes.append(entry)
+        
+    with open("all_preds.dat", "wb") as file:
+        pickle.dump(all_preds, file)
+    with open("all_gt_boxes.dat", "wb") as file:
+        pickle.dump(all_gt_boxes, file)
+    
+if __name__ == "__main__":    
+    data_path = "data" 
+    data_path_448 = "data_448x448"
+    use_cuda = True
+    try:
+        opts, args = getopt.getopt(sys.argv[1:],"p:d:h",["path=", "downsampled_path=", "help"])
+    except getopt.GetoptError:
+        print('main.py -p <path of data directory> -d <path of downsampled data directory>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-p':
+            data_path = arg
+        if opt == '-d':
+            data_path_448 = arg
+    data_path += "/"
+    data_path_448 += "/"
+
+    #region CUDA
+    if use_cuda and T.cuda.is_available():
+        print("CUDA ENABLED")
+        device = T.device("cuda")
+    else:                
+        print("CUDA NOT AVAILABLE OR DISABLED")
+        device = T.device("cpu")
+    #endregion
+
+    data_wrapper_images = DataWrapperImages(data_path, data_path_448)
+    data_wrapper_images.load_data_set()
+
+    run_validate(device, data_wrapper_images)
     

@@ -390,6 +390,14 @@ class DataWrapperImages:
         batch_labels = self.get_labels(indices, device)
         return batch_images, batch_boxes, batch_labels
 
+    def get_validation_batch_indices(self, batch_index, batch_size):
+        return self.get_batch_indices(batch_index, batch_size, self.validation_indices)
+
+    def get_batch_indices(self, batch_index, batch_size, target):        
+        start = batch_index*batch_size
+        indices = target[start:start+batch_size]
+        return indices
+
     def get_images(self, indices, device):
         """
         Returns a tensor containing the images associated with the indices.
