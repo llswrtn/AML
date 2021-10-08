@@ -6,15 +6,15 @@ import pandas as pd
 import torch
 
 # usage: 
-# tp, fp, all_tp, all_fp = generate_tp_fp(data_loader_test)
+# tp, fp, all_tp, all_fp, gt_nd = generate_tp_fp(data_loader_test)
 
-# ap, mrec, mprec = ap_rec_prec (tp_a, fp_a)
+# ap, mrec, mprec = ap_rec_prec (tp_a, fp_a, gt_nd)
 
-def ap_rec_prec (tp, fp):
+def ap_rec_prec (tp, fp, gt_nd):
 
 	    
 	tp_cumsum = np.cumsum(tp, dtype=float)
-	rec = tp_cumsum / len(tp)
+	rec = tp_cumsum / gt_nd
 
 
 	fp_cumsum = np.cumsum(fp, dtype=float)
@@ -38,6 +38,7 @@ def generate_tp_fp (test_dataloader, model, MIN_IOU = 0.5):
 
     all_tp = 0
     all_fp = 0
+    gt_nd=0
     
     for batch in test_dataloader:
         images, targets = batch
@@ -47,6 +48,7 @@ def generate_tp_fp (test_dataloader, model, MIN_IOU = 0.5):
         img_id = targets[0]['image_id']
         gt_boxes = targets[0]['boxes'].cpu().numpy().astype(np.int32)
         #print(gt_boxes)
+        gt_nd += len(gt_boxes)
 
         outputs = model(images)
         #keep = torchvision.ops.nms(outputs[0]['boxes'], outputs[0]['boxes'], NMS_THRESHOLD)
@@ -129,7 +131,7 @@ def generate_tp_fp (test_dataloader, model, MIN_IOU = 0.5):
     fp_ = fp_['fp'].tolist()
     
     print("TPs: " + str(all_tp)+ "   FPs: " + str(all_fp))
-    return tp_, fp_, all_tp, all_fp
+    return tp_, fp_, all_tp, all_fp, gt_nd
     
     
     

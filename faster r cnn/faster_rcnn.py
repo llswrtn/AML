@@ -33,38 +33,35 @@ from typing import List, Tuple, Dict, Optional, Any
 
 
 #number of training epochs
-NUM_EPOCHS = 100
-BATCH_SIZE = 2
+NUM_EPOCHS = 200
+BATCH_SIZE = 4
 
 #max size for resizing of input images
 
-IMG_MAX_SIZE = 480
+IMG_MAX_SIZE = 240
 
 #number of workers for dataloader (set back to zero if keeps getting killed)
-NUM_WORKERS = 4
+NUM_WORKERS = 2
 
 ROOT =  '/media/luisa/Volume/AML/siim-covid19-detection'
 CLEAN_TRAIN_PATH = '/media/luisa/Volume/AML/train_image_level_clean_paths.csv'
-#alternative path with only images that contain at least on bounding box
-#CLEAN_TRAIN_PATH = '/media/luisa/Volume/AML/train_image_level_clean_paths_NOTNA.csv'
+
 
 RESIZED_TRAIN_PATH = '/media/luisa/Volume/AML/resized_train_image_level_clean_paths.csv'
 RESIZED_ROOT = '/media/luisa/Volume/AML/siim-covid19-detection/resized480'
 
 
-m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_mobilenetV3_240_v1"
-indices_name = "test_set_fasterrcnn_mobilenetV3_240_100_epochs_v0.csv"
+m_save_path = "/media/luisa/Volume/AML/models/fasterrcnn_mobilenetV2_240_final"
+indices_name = "test_set_fasterrcnn_mobilenetV2_240_100_epochs_v0.csv"
 model_name = "fasterrcnn_mobilenet_240_100_epochs_v0.pth"
 indices_name = "test_set_fasterrcnn_fasterrcnn_mobilenet_240_100_epochs_v0.csv"
-model_name = "fasterrcnn_fasterrcnn_mobilenetV3_240_100_epochs_v0.pth"
+model_name = "fasterrcnn_fasterrcnn_mobilenetV2_240_100_epochs_v0.pth"
 
 
 
 #classes for classification (not implemented yet)
 CLASSES = ['Negative for Pneumonia',' Typical Appearance', 'Indeterminate Appearance', 'Atypical Appearance']
 
-#parameters for evaluation
-MIN_IOU = 0.5
 
 
 # model expects input to be list of tensors, our custom dataset therefore requires custom collate_fn function
@@ -99,17 +96,6 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 
 
-	print("Save an innocent training process from certain death!")
-	print("(Casual reminder to myself that I need to ""sudo swapoff -a"")")
-	y_key = input ("press [y] to continue \n")
-	
-
-	
-
-	
-
-
-
 	# train on the GPU if GPU is available
 	device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 	print('device: ' + str(device))
@@ -118,12 +104,9 @@ if __name__ == "__main__":
 	num_classes = 2
 
 
-	#dataset = ImageLevelSiimCovid19Dataset(ROOT, utils.get_transform(train=True), CLEAN_TRAIN_PATH)
 	dataset = ResizedImageLevelSiimCovid19Dataset(RESIZED_ROOT, utils.get_transform(train=True), RESIZED_TRAIN_PATH)
 	
-	#dataset_test = ImageLevelSiimCovid19Dataset(RESIZED_ROOT, utils.get_transform(train=False), RESIZED_TRAIN_PATH)
-	
-	#TODO: Option to load training indices from somewhere
+
 
 	# split the random permutation of dataset into train and test set
 	indices = torch.randperm(len(dataset)).tolist()
@@ -137,7 +120,7 @@ if __name__ == "__main__":
 
 	# train on 4828 images, keep remaining 1208 for test set, that's about an 80/20 split
 	
-	#dataset_train = torch.utils.data.Subset(dataset, indices[:100]) #debug train set
+
 	
 	dataset_train = torch.utils.data.Subset(dataset, indices[:4828])
 	dataset_test = torch.utils.data.Subset(dataset, indices[4828:])
@@ -151,52 +134,17 @@ if __name__ == "__main__":
 	# The model
 	
 	# load with pretrained weights
-	backbone = torchvision.models.mobilenet_v3_large(pretrained=True).features
-
-	#backbone.out_channels = 1280
-	backbone.out_channels = 960
+	#backbone = torchvision.models.mobilenet_v3_large(pretrained=True).features
+	#backbone.out_channels = 960
+	
+	backbone = torchvision.models.mobilenet_v2(pretrained=True).features
+	backbone.out_channels = 1280
 	
 	#scales and ratios found by k means
-	#        sizes=((128, 256, 512),),
-        #aspect_ratios=((0.5, 1.0, 2.0),),
-	#anchor_generator = AnchorGenerator(sizes=((32, 64, 128),), aspect_ratios=((1, 1.5, 2),))
-	'''
-	      if rpn_anchor_generator is None:
-            anchor_sizes = ((32,), (64,), (128,), (256,), (512,))
-            aspect_ratios = ((0.5, 1.0, 2.0),) * len(anchor_sizes)
-            rpn_anchor_generator = AnchorGenerator(
-                anchor_sizes, aspect_ratios
-            )
-            
-        '''    
-	anchor_generator = AnchorGenerator(sizes=((32, 64, 128),), aspect_ratios=((1.0, 1.5, 2.0),))
-	roi_pooler = torchvision.ops.MultiScaleRoIAlign(featmap_names=['0'],
-                                                output_size=7,
-                                                sampling_ratio=2)
- 
-	#model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, max_size =IMG_MAX_SIZE )
-	
-	model = FasterRCNN(backbone,
-                   num_classes=2,
-                   rpn_anchor_generator=anchor_generator,
-                   box_roi_pool=roi_pooler, 
-                   rpn_nms_thresh = 0.3, 
-                   rpn_post_nms_top_n_train = 8, 
-                   box_detections_per_img = 8)
-	
-	
-	#train on resized, no max size...max size 480 not possible
-	#box_detections_per_img (int): maximum number of detections per image, for all classes.
-	#model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, box_detections_per_img = 3, max_size =IMG_MAX_SIZE, rpn_anchor_generator=anchor_generator, box_roi_pool=roi_pooler )
-	
-	# get number of input features for the classifier
-	#in_features = model.roi_heads.box_predictor.cls_score.in_features
-	# replace the pre-trained head with a new one
-	#model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-	
 	# aspect ratio common in this dataset. check sizes after resizing!
 	
-	'''
+	
+		'''
 	From AnchorGenerator source code:
 		    ''The module support computing anchors at multiple sizes and aspect ratios
 	    per feature map. This module assumes aspect ratio = height / width for
@@ -213,6 +161,29 @@ if __name__ == "__main__":
 		sizes (Tuple[Tuple[int]]):
 		aspect_ratios (Tuple[Tuple[float]]):''
 	'''
+
+	
+   
+	anchor_generator = AnchorGenerator(sizes=((32, 64, 128),), aspect_ratios=((1.0, 1.5, 2.0),))
+	roi_pooler = torchvision.ops.MultiScaleRoIAlign(featmap_names=['0'],
+                                                output_size=7,
+                                                sampling_ratio=2)
+ 
+ 
+ 
+	#model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True, max_size =IMG_MAX_SIZE )
+	
+	# box_nms_thresh (float): NMS threshold for the prediction head. Used during inference	
+	model = FasterRCNN(backbone,
+                   num_classes=2,
+                   max_size =IMG_MAX_SIZE,
+                   rpn_anchor_generator=anchor_generator,
+                   box_roi_pool=roi_pooler, 
+                   box_nms_thresh = 0.3)
+	
+	
+
+
 
 	
 	if args.load:
@@ -232,23 +203,20 @@ if __name__ == "__main__":
 	
 	
 	# learning rate scheduler
+	optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.0005)	
 	
-	optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.01)	
+	
+	# learning rate scheduler
+	
 	lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
-	#lr_scheduler = None
+
 	
 	'''	
 	#Needed for ResNet50, lower weight_decay and higher lr causes NaN losses
 	#optimizer = torch.optim.SGD(params, lr=1e-8, momentum=0.9, weight_decay=0.05)
 	
-	#reduce lr only once a plateau is reached
-	lr_scheduler =  torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+
 	'''
-
-
-
-
-
 	
 	num_epochs = NUM_EPOCHS
 	loss_hist = Loss()
@@ -287,6 +255,11 @@ if __name__ == "__main__":
 	
 	for epoch in range(num_epochs):
 		loss_hist.reset()
+		
+		if epoch == 0:
+			warmup_factor = 1. / 1000
+			warmup_iters = min(1000, len(data_loader) - 1)
+			lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
 	    
 		for images, targets in data_loader:
 			images = list(image.to(device) for image in images)
@@ -315,8 +288,6 @@ if __name__ == "__main__":
 			    print(f"Iteration #{itr} loss: {loss_value}")
 			itr += 1
 			if lr_scheduler is not None:
-			    # 3 warmup epochs
-			    if epoch > 2:
 			        lr_scheduler.step()
 
 		print(f"Epoch #{epoch} loss: {loss_hist.value}")  
@@ -328,8 +299,8 @@ if __name__ == "__main__":
 		    
 		
 		    model.eval()
-		    tp, fp, all_tp, all_fp = evaluate.generate_tp_fp(data_loader_test, model)
-		    ap, mrec, mprec = evaluate.ap_rec_prec (tp, fp)
+		    tp, fp, all_tp, all_fp, gt_nd = evaluate.generate_tp_fp(data_loader_test, model)
+		    ap, mrec, mprec = evaluate.ap_rec_prec (tp, fp, gt_nd)
 		    prec_name = "prec" + str(ep) + ".npy"
 		    rec_name = "rec" + str(ep) + ".npy"
 		    np.save(os.path.join(m_save_path, 'rec', rec_name), mrec)
