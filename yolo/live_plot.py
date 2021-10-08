@@ -4,15 +4,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from epoch_logger import *
 
-#NAME = "2021-10-05_V1" #CHANGE THIS
-#NAME = "2021-10-06_V2" #CHANGE THIS
-#NAME = None
-NAME = "test"
+prefix_results = "results/test/"
 
 COLOR_TRAIN = "black"
 COLOR_VALIDATE = "green"
 
-def load(prefix_results):
+def load():
     epoch_logger_train = None
     epoch_logger_validate = None
 
@@ -70,9 +67,6 @@ def update_plot(epoch_logger_train, epoch_logger_validate, old_epoch_logger_trai
 
 if __name__ == "__main__": 
     print("starting live plot")
-    prefix_results = ""
-    if not (NAME is None):
-        prefix_results = "results/" + NAME + "/"
     print("prefix_results:", prefix_results)
 
     old_epoch_logger_train = None
@@ -84,7 +78,7 @@ if __name__ == "__main__":
     plt.tight_layout()
 
     while True:
-        epoch_logger_train, epoch_logger_validate = load(prefix_results)
+        epoch_logger_train, epoch_logger_validate = load()
         update_plot(epoch_logger_train, epoch_logger_validate, old_epoch_logger_train, old_epoch_logger_validate, fig, axs)
         old_epoch_logger_train = epoch_logger_train
         old_epoch_logger_validate = epoch_logger_validate

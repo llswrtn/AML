@@ -7,9 +7,11 @@ from epoch_logger import *
 #NAME = "2021-10-05_V1" #CHANGE THIS
 #NAME = "2021-10-06_V2" #CHANGE THIS
 #NAME = None
-NAME = "test" #CHANGE THIS
+#NAME = "test" #CHANGE THIS
 #NAME = "threshold" #CHANGE THIS
 USE_THRESHOLD = False
+
+prefix_results = "results/test/"
 
 COLOR_TRAIN = "black"
 COLOR_VALIDATE = "green"
@@ -23,7 +25,7 @@ epoch_logger_name = "epoch_logger_ap.pt"
 if USE_THRESHOLD:
     epoch_logger_name = "epoch_logger_threshold.pt"
 
-def load(prefix_results):
+def load():
     epoch_logger_ap = None
     with open(prefix_results+epoch_logger_name, "rb") as file:
         epoch_logger_ap = pickle.load(file)
@@ -87,9 +89,6 @@ def update_plot(epoch_logger_ap, old_epoch_logger_ap, fig, axs):
 
 if __name__ == "__main__": 
     print("starting live plot")
-    prefix_results = ""
-    if not (NAME is None):
-        prefix_results = "results/" + NAME + "/"
     print("prefix_results:", prefix_results)
     
     old_epoch_logger_ap = None
@@ -100,7 +99,7 @@ if __name__ == "__main__":
     plt.tight_layout()
 
     while True:
-        epoch_logger_ap = load(prefix_results)
+        epoch_logger_ap = load()
         update_plot(epoch_logger_ap, old_epoch_logger_ap, fig, axs)
         old_epoch_logger_ap = epoch_logger_ap
         plt.pause(3)
