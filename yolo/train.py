@@ -31,6 +31,7 @@ def run_train(device, data_wrapper_images):
     ##############################################################################################################
 
     allow_classification_error = False
+    allow_classification_error_no_boxes = False
     continue_training = False
     max_num_epochs = 1000
     batch_size = 64
@@ -75,7 +76,7 @@ def run_train(device, data_wrapper_images):
     #yolo = YoloCellBased(number_of_classes=4, boxes_per_cell=2).to(device)
     #yolo = YoloImageBased(number_of_classes=4, boxes_per_cell=2).to(device)
     #yolo = YoloCellBased(number_of_classes=4, boxes_per_cell=2, architecture=ARCHITECTURE_FAST).to(device)
-    yolo = YoloImageBased(number_of_classes=4, boxes_per_cell=2, architecture=ARCHITECTURE_FAST, allow_classification_error=allow_classification_error).to(device)
+    yolo = YoloImageBased(number_of_classes=4, boxes_per_cell=2, architecture=ARCHITECTURE_FAST, allow_classification_error=allow_classification_error, allow_classification_error_no_boxes=allow_classification_error_no_boxes).to(device)
     yolo.debug = False
     yolo.initialize(device)
 
