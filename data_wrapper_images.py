@@ -48,6 +48,7 @@ class DataWrapperImages:
         self.load_data_set_boxes()
         self.load_data_set_labels()   
         self.load_annotated_list()
+        self.export_annotated_unannotated_list()
         self.load_data_set_images()
         print("load data completed")
         #print(self.images_448)
@@ -204,6 +205,27 @@ class DataWrapperImages:
 
         print("annotated_list:", len(self.annotated_list))
         print("unannotated_list:", len(self.unannotated_list))
+
+    def export_annotated_unannotated_list(self):
+        """
+        Export annotated list and unannotated list as CSV for use without this DataWrapper class.
+        """
+        self.export_list_csv(list_to_eport=self.annotated_list, file_name="list_images_annotated.csv")
+        self.export_list_csv(list_to_eport=self.unannotated_list, file_name="list_images_not_annotated.csv")
+
+    def export_list_csv(self, list_to_eport, file_name):
+        """
+        Helper method for export_annotated_unannotated_list().
+        """
+        col_index = []
+        col_id = []
+        col_index.append("image_index")
+        col_id.append("image_id")
+        for _, image_index in enumerate(list_to_eport):
+            image_id = self.lut_image_index_to_image_id[image_index]
+            col_index.append(image_index)
+            col_id.append(image_id)
+        np.savetxt(file_name, [p for p in zip(col_index, col_id)], delimiter=',', fmt='%s')
 
     def load_data_set_boxes(self):
         """
