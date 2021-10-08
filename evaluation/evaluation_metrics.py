@@ -23,8 +23,12 @@ def generate tp_fp_arrays (all_gt_boxes_, all_preds ):
 	nd = len(all_preds_)
 	tp = [0] * nd # creates an array of zeros of size nd
 	fp = [0] * nd
+	
+	gt_nd = len(all_gt_boxes)
 	all_tp = 0
 	all_fp = 0
+	
+	
 
 	#for each detected objct (detected_box)
 	for i in range (len(all_preds)):
@@ -101,16 +105,16 @@ def generate tp_fp_arrays (all_gt_boxes_, all_preds ):
 		fp[i] =1
 		all_fp +=1    
 		
-	return tp, fp    
+	return tp, fp, gt_nd   
 
 
 
 
-def ap_rec_prec (tp, fp):
+def ap_rec_prec (tp, fp, gt_nd):
 
 	    
 	tp_cumsum = np.cumsum(tp, dtype=float)
-	rec = tp_cumsum / len(tp)
+	rec = tp_cumsum / gt_nd
 
 
 	fp_cumsum = np.cumsum(fp, dtype=float)
