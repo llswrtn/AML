@@ -30,9 +30,9 @@ def run_train(device, data_wrapper_images):
     #
     ##############################################################################################################
 
-    allow_classification_error = False
-    allow_classification_error_no_boxes = False
-    continue_training = False
+    allow_classification_error = True
+    allow_classification_error_no_boxes = True
+    continue_training = True
     max_num_epochs = 1000
     batch_size = 64
     LEARNING_RATE = 0.0001
