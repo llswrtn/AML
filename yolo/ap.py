@@ -176,7 +176,7 @@ def calculate_ap(all_gt_boxes, all_preds):
     sum_AP = 0
         
     tp_cumsum = np.cumsum(tp, dtype=float)
-    rec = tp_cumsum / len(tp)
+    rec = tp_cumsum / len(all_gt_boxes[0])
 
     fp_cumsum = np.cumsum(fp, dtype=float)
     prec = tp_cumsum /(fp_cumsum + tp_cumsum)

@@ -23,7 +23,7 @@ from tqdm import tqdm
 from PIL import Image
 from ap import *
 
-prefix_results = "results/threshold/"
+prefix_results = "results/changed_recall/"
 prefix_output = "saved_output/2021-10-05_V1/"
 
 yolo_file_name = "saved_output/2021-10-05_V1/299.pt"
@@ -85,7 +85,7 @@ def run_gather_ap(device, data_wrapper_images, prefix_results, prefix_output):
     ##############################################################################################################
 
     T.autograd.set_detect_anomaly(True)
-    for i in range(num_thresholds): 
+    for i in range(1, num_thresholds): 
         #[ap, all_tp, all_fp]
         threshold = (i/(num_thresholds-1))
         run_epoch(threshold, epoch_logger_threshold, batch_size, num_validation_batches, yolo, data_wrapper_images, device, prefix_output)

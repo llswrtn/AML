@@ -23,7 +23,7 @@ from tqdm import tqdm
 from PIL import Image
 from ap import *
 
-prefix_results = "results/test/"
+prefix_results = "results/changed_recall/"
 prefix_output = "saved_output/2021-10-05_V1/"
 
 #NAME = "2021-10-05_V1" #CHANGE THIS

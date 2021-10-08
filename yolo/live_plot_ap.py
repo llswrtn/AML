@@ -11,7 +11,7 @@ from epoch_logger import *
 #NAME = "threshold" #CHANGE THIS
 USE_THRESHOLD = False
 
-prefix_results = "results/test/"
+prefix_results = "results/changed_recall/"
 
 COLOR_TRAIN = "black"
 COLOR_VALIDATE = "green"
@@ -40,7 +40,8 @@ def update_plot(epoch_logger_ap, old_epoch_logger_ap, fig, axs):
 
     x = np.linspace(0, epoch_logger_ap.epoch_index, epoch_logger_ap.epoch_index + 1)
     if USE_THRESHOLD:
-        x = np.linspace(0, 1, epoch_logger_ap.epoch_index + 1)
+        x = np.linspace(0, 1, epoch_logger_ap.epoch_index + 2)
+        x = x[1:]
 
     print("update plot, epoch:", epoch_logger_ap.epoch_index, "num_boxes:",epoch_logger_ap.num_ground_truth_boxes)
     print("x", x)

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from epoch_logger import *
 
 
-export_name = "yolo"
+export_name = "yolo_improved"
 
 
 
@@ -148,8 +148,13 @@ def export_plot(epoch_logger_train, epoch_logger_validate, epoch_logger_ap, epoc
     plt.savefig(fname="plot_"+export_name+"_predicted_classes.pdf", format="pdf")
     plt.close()
 
-
-
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.set(title="fp / nd", xlabel="epoch", ylabel="")
+    ax.plot(epoch_logger_ap.list_fp_percentage, COLOR_VALIDATE)
+    #ax.legend(loc="best")
+    plt.savefig(fname="plot_"+export_name+"_fp_nd.pdf", format="pdf")
+    plt.close()
 
 
 
