@@ -320,6 +320,13 @@ class DataWrapperImages:
         num_batches = int(len(self.test_indices) / batch_size)
         return num_batches
 
+    def get_train_or_validation_batch(self, is_train, batch_index, batch_size, device):
+        if is_train:
+            return self.get_train_batch(batch_index, batch_size, device)
+        else:
+            return self.get_validation_batch(batch_index, batch_size, device)
+
+
     def get_train_batch(self, batch_index, batch_size, device):
         """
         Get the training data of the batch with the specified index.

@@ -21,8 +21,8 @@ import os
 from tqdm import tqdm
 from PIL import Image
 
-def run_train(device, data_wrapper_images):
-    print("run_train")
+def run_validate(device, data_wrapper_images):
+    print("run_validate")
 
     ##############################################################################################################
     #
@@ -30,7 +30,6 @@ def run_train(device, data_wrapper_images):
     #
     ##############################################################################################################
 
-    continue_training = True
     max_num_epochs = 1000
     batch_size = 64
     LEARNING_RATE = 0.0001
@@ -56,14 +55,11 @@ def run_train(device, data_wrapper_images):
 
     epoch_logger_train = None
     epoch_logger_validate = None
-    if continue_training:
-        with open("epoch_logger_train.pt", "rb") as file:
-            epoch_logger_train = pickle.load(file)
-        with open("epoch_logger_validate.pt", "rb") as file:
-            epoch_logger_validate = pickle.load(file)
-    else:
-        epoch_logger_train = EpochLogger(name="epoch_logger_train", num_images=num_train_images)
-        epoch_logger_validate = EpochLogger(name="epoch_logger_validate", num_images=num_validation_images)
+    
+    with open("epoch_logger_train.pt", "rb") as file:
+        epoch_logger_train = pickle.load(file)
+    with open("epoch_logger_validate.pt", "rb") as file:
+        epoch_logger_validate = pickle.load(file)
 
     ##############################################################################################################
     #
@@ -78,9 +74,8 @@ def run_train(device, data_wrapper_images):
     yolo.debug = False
     yolo.initialize(device)
 
-    if continue_training:
-        file_name = str(epoch_logger_train.epoch_index) + ".pt"
-        yolo.load(path="output/"+file_name, device=device)
+    file_name = str(epoch_logger_train.epoch_index) + ".pt"
+    yolo.load(path="output/"+file_name, device=device)
 
     optimizer = optim.Adam(yolo.parameters(), lr=LEARNING_RATE)
 
@@ -90,51 +85,26 @@ def run_train(device, data_wrapper_images):
     #
     ##############################################################################################################
 
-    T.autograd.set_detect_anomaly(True)
-    while epoch_logger_train.epoch_index < (max_num_epochs - 1):  
-        #train
-        run_epoch(True, epoch_logger_train, batch_size, num_train_batches, yolo, optimizer, data_wrapper_images, device)
-        #validate
-        run_epoch(False, epoch_logger_validate, batch_size, num_validation_batches, yolo, optimizer, data_wrapper_images, device)
-        #save the model  
-        yolo.save("output/"+str(epoch_logger_train.epoch_index)+".pt")
+    #T.autograd.set_detect_anomaly(True)
+    run_epoch(False, epoch_logger_validate, batch_size, num_validation_batches, yolo, optimizer, data_wrapper_images, device)
 
-    #print("##########")
-
-    #print("predictions", predictions)
-    #print("list_filtered_converted_box_data", list_filtered_converted_box_data)
-
-    
-def run_epoch(is_train, epoch_logger, batch_size, num_batches, yolo, optimizer, data_wrapper_images, device):
-    #start of a new epoch  
-    epoch_logger.start_epoch()
-    print(epoch_logger.name+" start epoch index: ", epoch_logger.epoch_index)
-    if is_train:
-        yolo.train()
-    else:
-        yolo.eval()
+    yolo.eval()
 
     T.set_grad_enabled(is_train)
 
     #loop over all batches
-    for batch_index in tqdm(range(num_batches)):
+    for batch_index in tqdm(range(num_validation_batches)):
         #zero the gradient since we do not want to use the previous mini batch
         optimizer.zero_grad()
         #get the data of the current train batch
-        batch_images, batch_boxes, batch_labels = data_wrapper_images.get_train_or_validation_batch(is_train, batch_index, batch_size, device) 
+        batch_images, batch_boxes, batch_labels = data_wrapper_images.get_validation_batch(batch_index, batch_size, device) 
         #get the results of the yolo network
         forward_result = yolo(batch_images)
         #get everything in one go (loss, class prediction, and boxes)
         total_loss, part_1, part_2, part_3, part_4, part_5, predictions, list_filtered_converted_box_data = yolo.get_batch_loss_and_class_predictions_and_boxes(forward_result, batch_boxes, batch_labels)
 
-        if is_train:    
-            #update neural network  
-            total_loss.backward()
-            T.nn.utils.clip_grad_norm_(yolo.parameters(), 1.0)
-            optimizer.step()
-
-        epoch_logger.add_loss(total_loss,part_1,part_2,part_3,part_4,part_5)
+        print(predictions)
     
-    #at the end of the epoch, store results
-    epoch_logger.store()
-    epoch_logger.print_epoch()
+    
+
+    
