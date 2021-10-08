@@ -44,6 +44,16 @@ class EpochLogger():
         epoch_data.l4 += l4.item() if isinstance(l4, T.Tensor) else l4
         epoch_data.l5 += l5.item() if isinstance(l5, T.Tensor) else l5
 
+    def print_epoch(self):
+        epoch_data = self.list_epoch_data[self.epoch_index]
+        print("total_loss", epoch_data.total_loss)
+        print("l1", epoch_data.l1)
+        print("l2", epoch_data.l2)
+        print("l3", epoch_data.l3)
+        print("l4", epoch_data.l4)
+        print("l5", epoch_data.l5)
+
+
     def store(self):
         """
         Store the current values.

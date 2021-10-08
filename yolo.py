@@ -664,7 +664,7 @@ class Yolo(BasicNetwork):
         :returns converted_box_data: tensor in the shape (num_boxes, 5+C)
         box coordinates are represented as (x1, y1, x2, y2) with 0 <= x1 < x2 and 0 <= y1 < y2
         """
-        converted_box_data = separate_box_data
+        converted_box_data = separate_box_data.clone()
         #center coordinates are relative to the grid cells
         #interpolate inside the grid cells to get coordinates relative to image
         center_x = T.lerp(
@@ -941,12 +941,12 @@ class Yolo(BasicNetwork):
             ground_truth_boxes = batch_boxes[i]
             ground_truth_label = batch_labels[i]
             total_loss_i, part_1_i, part_2_i, part_3_i, part_4_i, part_5_i = self.get_loss(converted_box_data, ground_truth_boxes, ground_truth_label, lambda_coord=lambda_coord, lambda_noobj=lambda_noobj)
-            total_loss += total_loss_i
-            part_1 += part_1_i
-            part_2 += part_2_i
-            part_3 += part_3_i
-            part_4 += part_4_i
-            part_5 += part_5_i
+            total_loss = total_loss + total_loss_i
+            part_1 = part_1 + part_1_i
+            part_2 = part_2 + part_2_i
+            part_3 = part_3 + part_3_i
+            part_4 = part_4 + part_4_i
+            part_5 = part_5 + part_5_i
             #predictions
             predictions_i = self.get_class_prediction(filtered_converted_box_data, converted_box_data)
             predictions[i] = predictions_i
@@ -1038,12 +1038,12 @@ class Yolo(BasicNetwork):
         #PART 2: box dimension error
         box_dimension_errors = responsible_indices_1 * (
             T.square(
-                T.sqrt(ground_truth_boxes_x2-ground_truth_boxes_x1) - 
-                T.sqrt(converted_box_data_x2-converted_box_data_x1)
+                T.sqrt(ground_truth_boxes_x2-ground_truth_boxes_x1 + 1e-8) - 
+                T.sqrt(converted_box_data_x2-converted_box_data_x1 + 1e-8)
             ) + 
             T.square(
-                T.sqrt(ground_truth_boxes_y2-ground_truth_boxes_y1) - 
-                T.sqrt(converted_box_data_y2-converted_box_data_y1)
+                T.sqrt(ground_truth_boxes_y2-ground_truth_boxes_y1 + 1e-8) - 
+                T.sqrt(converted_box_data_y2-converted_box_data_y1 + 1e-8)
             )
         )
         part_2 = lambda_coord * T.sum(box_dimension_errors)   

@@ -1,6 +1,7 @@
 from data_wrapper_images import DataWrapperImages
 from yolo import Yolo
 from tests import run_tests
+from train import run_train
 import torch as T
 import numpy as np
 import pydicom as dicom
@@ -38,7 +39,8 @@ if __name__ == "__main__":
 
     data_wrapper_images = DataWrapperImages(data_path, data_path_448)
     data_wrapper_images.load_data_set()
-    run_tests(device, data_wrapper_images)
+    #run_tests(device, data_wrapper_images)
+    run_train(device, data_wrapper_images)
 
     """
     path = data_wrapper_images.get_image_path(4438)

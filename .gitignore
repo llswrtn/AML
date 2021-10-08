@@ -1,3 +1,6 @@
 data/
 data_448x448/
+saved_output/
+output/
+results/
 __pycache__/

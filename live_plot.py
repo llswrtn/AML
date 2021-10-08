@@ -51,13 +51,13 @@ def update_plot(epoch_logger_train, epoch_logger_validate, old_epoch_logger_trai
     axs[1, 0].legend(loc="best")
 
     axs[1, 1].set(title="L4 (confidence noobj)", xlabel="epoch", ylabel="L4")
-    axs[1, 1].plot(epoch_logger_train.list_l3, COLOR_TRAIN, label="train")
-    axs[1, 1].plot(epoch_logger_validate.list_l3, COLOR_VALIDATE, label="validate")
+    axs[1, 1].plot(epoch_logger_train.list_l4, COLOR_TRAIN, label="train")
+    axs[1, 1].plot(epoch_logger_validate.list_l4, COLOR_VALIDATE, label="validate")
     axs[1, 1].legend(loc="best")
 
     axs[1, 2].set(title="L5 (classification)", xlabel="epoch", ylabel="L5")
-    axs[1, 2].plot(epoch_logger_train.list_l3, COLOR_TRAIN, label="train")
-    axs[1, 2].plot(epoch_logger_validate.list_l3, COLOR_VALIDATE, label="validate")
+    axs[1, 2].plot(epoch_logger_train.list_l5, COLOR_TRAIN, label="train")
+    axs[1, 2].plot(epoch_logger_validate.list_l5, COLOR_VALIDATE, label="validate")
     axs[1, 2].legend(loc="best")
 
     plt.tight_layout()
